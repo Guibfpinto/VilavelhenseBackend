@@ -1,31 +1,5 @@
 nome_completo;apelido;data_nascimento;posicao;pe_pref;altura_cm;peso_kg;cidade_nascimento;uf_nascimento;pais_nascimento;ogol_id;Lesao_Muscular_Isquiotibiais;Lesao_Muscular_Adutor;Lesao_Muscular_Quadriceps;Lesao_Contusao;Lesao_LCA;Lesao_LCM;Lesao_LCP;Lesao_Canto_Postero_Lateral;Lesao_Meniscal;Lesao_Tendao_Patelar;Lesao_Tendao_Quadricipital;Lesao_Fratura_Patela;Lesao_Entorse_Tornozelo;Lesao_Fratura_Tornozelo;Lesao_Sindesmose;Lesao_Canelite;Lesao_Fratura_Estresse_Perna;Lesao_Fratura_Tibia_Fibula;Lesao_Fascite_Plantar;Lesao_Fratura_Metatarso;Lesao_Metatarsalgia;Lesao_Joanete;Lesao_Fratura_Dedo_Pe;Lesao_Sindrome_Piriforme;Lesao_Bursite_Trocanterica;Lesao_Contratura_Lombar;Lesao_Hernia_Disco;Lesao_Espondilolise;Lesao_Espondilolistese;Lesao_Hernia_Inguinal;Lesao_Luxacao_Dedo_Mao;Lesao_Fratura_Dedo_Mao;Lesao_Fratura_Punho;Lesao_Luxacao_Punho;Lesao_Luxacao_Ombro;Lesao_Manguito_Rotador;Lesao_Fratura_Clavicula;Lesao_Concussao_Cerebral;Lesao_Fratura_Nariz;Lesao_Fratura_Face;Lesao_Lesao_Oral;Lesao_Laceracao_Supercilio;Lesao_Estiramento_Ligamento_Lateral_Joelho;Lesao_Deslocamento_Ombro;Lesao_Torcao_Tornozelo
 Lucas Jorge Pacheco Ferreira;Lucão;1997-09-25;Goleiro;D;199;96.0;Três Rios;RJ;BRA;662435;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;2026-04-23/2026-05-31;
-João Victor Gomes dos Santos Alves;João Victor;2003-07-07;Goleiro;D;185;78.0;Mimoso do Sul;ES;BRA;982334;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 Jeferson David Palacios Cantillo;Jeferson Palacios;2000-01-03;Zagueiro;D;187;90.0;Rioacha;La Guajira;COL;787886;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-Alexis Sánchez Florentin;Alexis Sánchez;2004-06-20;Lateral Direito / Ponta-Direita;D;178;73.0;San Isidro;Buenos Aires;ARG;1521958;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-Gabriel Amorim de Aguiar;Gabriel Amorim;2004-07-27;Volante / Zagueiro / Lateral Direito;D;;;Serra;ES;BRA;1542489;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-Fabiano Ribeiro Rigamont Gomes;Fabiano Ribeiro;2008-11-12;Zagueiro;;;;;;BRA;3517569;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 João Victor Rozário da Rocha;João Rozário;2003-02-23;Meia-Central / Lateral Esquerdo;C;180;72.0;Cariacica;ES;BRA;902427;;2026-03-15/2026-05-09;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-Wesley Emannuel Augusto Almeida;Wesley;2005-07-23;Meia-Central;D;;;RJ;BRA;3497808;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-João Pedro Firmino Oliveira;João Firmino;2001-11-09;Volante / Lateral Direito;D;175;74.0;Cariacica;ES;BRA;649473;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 Virgílio Santos Borges;Borjão;1996-06-11;Volante;D;186;76.0;Salvador;BA;BRA;481421;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-Fábio Goncalves de Souza;Fábio Makelelé;1996-04-09;Lateral Direito / Volante;D;178;71.0;Santo Antônio de Pádua;RJ;BRA;499969;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-Daniel dos Santos Rodrigues do Nascimento;Daniel Rodrigues;2000-03-21;Centroavante;D;183;90.0;Niterói;RJ;BRA;692782;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-Davis Almeida Paiva dos Santos;Davis;2005-05-13;Ponta Esquerda / Centroavante;D;181;82.0;Serra;ES;BRA;877821;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-Lucas da Costa Bonete;Lucas Bonete;2002-02-12;Meia Atacante / Ponta Direita / Centroavante / Segundo Atacante;C;181;72.0;Porto Alegre;RS;BRA;690475;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;2026-05-17
-Emanuel Lopes da Silva;Emanuel;2005-12-09;Centroavante / Ponta Esquerda / Segundo Atacante;D;173;71.0;;;BRA;975154;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;2026-01-20;;
-Jarles Pereira de Santana;Jarles Baiano;1996-03-16;Centroavante;D;176;90.0;Itabela;BA;BRA;450048;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-Peterson Lucas Almeida França;Peterson;2001-10-30;Meia Atacante;C;167;70.0;Vitória;ES;BRA;777047;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-Marcelo Breno de Jesus Costa;Marcelo Costa;2008-01-16;Zagueiro;;;;;;BRA;1521964;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-José Vitor Neves Leal;José Vitor;2000-07-26;Zagueiro;D;190;89;Rio de Janeiro;RJ;BRA;854889;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-Gabriel Ferreira dos Santos;Gabriel Santos;1999-02-19;Lateral Esquerdo;C;181;73.0;Vitória;ES;BRA;650970;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-Diego Andrade Gonçalves;Diego Andarde;1994-05-08;Volante;D;187;73.0;;BA;BRA;707509;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-Marcílio Reis do Nascimento;Marcílio;2004-04-28;Ponta Direita;C;;;;;BRA;1634886;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-Rhamon Marcellino Oliveira;Rhamon Mexicano;1994-09-27;Zagueiro;C;187;;Vitória;ES;BRA;480809;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-Hugo Lima Neves;Hugo;2008-06-03;Zagueiro;;;;;;BRA;3515123;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-Arthur Jacinto Pereira;Arthur Pereira;2006-10-13;Volante;;;;;;BRA;2483114;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-Cleidson Negris Silva;Negris;2006-11-03;Goleiro;;;;;;BRA;2472707;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-Stuart Asafe Ferreira Alves;Stuart;1998-07-19;Ponta Dirita / Meia Atacante;A;173;70.0;Linhares;ES;BRA;619320;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-Richardy de Oliveira Silva;Richardy;2007-10-08;Ponta;;;;;;BRA;1204149;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-Marlon Carvalho de Castro;Marlon;1996-03-20;Ponta Esquerda / Meia Atacante;D;178;76.0;Pedro Canário;ES;BRA;505514;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-Roberto Mário Durango Pacheco;Roberto Durango;2004-03-09;Meia-Central;D;178;74.0;Cerete;Cordoba;COL;3547576;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
