@@ -1,17 +1,26 @@
 import os
 
 class Config:
+    # ============================================================
+    # CONFIGURAÇÕES GERAIS DO SERVIDOR
+    # ============================================================
     DEBUG = True
     HOST = '0.0.0.0'
     PORT = 5000
-    CORS_ORIGINS = '*'  # Em produção, coloque a URL do seu app Expo
+    CORS_ORIGINS = '*'  # Em produção, defina a URL do seu app Expo
 
+    # ============================================================
+    # CAMINHOS DAS PASTAS
+    # ============================================================
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     DATA_FOLDER = os.path.join(BASE_DIR, 'data')
     os.makedirs(DATA_FOLDER, exist_ok=True)
 
-    # Arquivos
+    # ============================================================
+    # ARQUIVOS DE DADOS (CSV, JSON, SQLite)
+    # ============================================================
     ARQUIVO_USUARIOS = os.path.join(DATA_FOLDER, 'usuarios.json')
+
     ARQUIVOS_CSV = {
         'profissional': os.path.join(DATA_FOLDER, 'perfil_completo_jogadores_profissional_2027.csv'),
         'sub20': os.path.join(DATA_FOLDER, 'perfil_completo_jogadores_Sub20_2027.csv'),
@@ -19,14 +28,17 @@ class Config:
         'comissao_profissional': os.path.join(DATA_FOLDER, 'perfil_completo_comissao_2027.csv'),
         'comissao_sub20': os.path.join(DATA_FOLDER, 'perfil_completo_comissao_Sub20_2027.csv'),
     }
+
     ARQUIVOS_LESOES = {
         'profissional': os.path.join(DATA_FOLDER, 'jogadores_vilavelhense_profissional_lesoes.csv'),
         'sub20': os.path.join(DATA_FOLDER, 'jogadores_vilavelhense_Sub20_lesoes.csv'),
     }
+
     ARQUIVOS_BIO = {
         'profissional': os.path.join(DATA_FOLDER, 'jogadores_vilavelhense_profissional_Bioimpedancia.csv'),
         'sub20': os.path.join(DATA_FOLDER, 'jogadores_vilavelhense_Sub20_Bioimpedancia.csv'),
     }
+
     ARQUIVOS_CARTOES = {
         'profissional': os.path.join(DATA_FOLDER, 'cartoes_acumulados_profissional.json'),
         'sub20': os.path.join(DATA_FOLDER, 'cartoes_acumulados_sub20.json'),
@@ -36,11 +48,37 @@ class Config:
         'comissao_sub17': os.path.join(DATA_FOLDER, 'cartoes_acumulados_comissao_sub17.json'),
     }
 
+    # ============================================================
+    # BANCO SQLITE DE FALLBACK (para partidas)
+    # ============================================================
+    SQLITE_PATH = os.path.join(DATA_FOLDER, 'meu_futebol.db')
+
+    # ============================================================
+    # CATEGORIAS VÁLIDAS
+    # ============================================================
     CATEGORIAS_JOGADORES = ['profissional', 'sub20', 'sub17']
     CATEGORIAS_COMISSAO = ['comissao_profissional', 'comissao_sub20', 'comissao_sub17']
     CATEGORIAS_CARTOES = CATEGORIAS_JOGADORES + CATEGORIAS_COMISSAO
 
-    # Atributos FM26 - Jogadores
+    # ============================================================
+    # CONFIGURAÇÕES DA API-FOOTBALL
+    # ============================================================
+    API_KEY = "51e827a67129dbf7e4126c59ac155623"
+    BASE_URL = "https://v3.football.api-sports.io"
+    TEAM_ID = 15609  # ID do Vilavelhense FC na API
+    HEADERS_API = {
+        "x-rapidapi-key": API_KEY,
+        "x-rapidapi-host": "v3.football.api-sports.io"
+    }
+
+    # ============================================================
+    # URL DA FASTAPI (FALLBACK PARA PARTIDAS)
+    # ============================================================
+    FASTAPI_URL = "http://localhost:8000"  # Altere se a FastAPI estiver em outro IP/porta
+
+    # ============================================================
+    # ATRIBUTOS FM26 – JOGADORES
+    # ============================================================
     ATRIBUTOS_FM26_JOGADORES = [
         # Técnicos
         'escanteios', 'cruzamentos', 'drible', 'finalizacao', 'primeiro_controle',
@@ -64,7 +102,9 @@ class Config:
         'esportividade', 'temperamento', 'controversia'
     ]
 
-    # Atributos FM26 - Comissão
+    # ============================================================
+    # ATRIBUTOS FM26 – COMISSÃO TÉCNICA
+    # ============================================================
     ATRIBUTOS_FM26_COMISSAO = [
         'CA', 'PA', 'reputacao_mundial', 'reputacao_atual', 'reputacao_local',
         'qualificacoes_treinador', 'jogos_selecao', 'gols_selecao',
