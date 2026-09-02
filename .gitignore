@@ -1,0 +1,29 @@
+# Ambiente virtual
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Dados (opcional – remova as próximas linhas se quiser subir os CSVs)
+# data/*.csv
+# data/*.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+*.sqlite
+*.sqlite3
+
+# Sistema
+.DS_Store
+Thumbs.db

@@ -1,0 +1,476 @@
+{
+  "cartoes": {
+    "Davi Carioca": {
+      "amarelos": 2,
+      "vermelho": false,
+      "suspenso_proxima": false,
+      "historico": [
+        {
+          "data": "25/02/2026",
+          "adversario": "Sport Capixaba",
+          "competicao": "Capixabão Sub-20",
+          "cor": "amarelo",
+          "terceiro_amarelo": false,
+          "suspenso_causada": false,
+          "suspenso_cumprida": false
+        },
+        {
+          "data": "25/03/2026",
+          "adversario": "Vitória-ES",
+          "competicao": "Capixabão Sub-20",
+          "cor": "amarelo",
+          "terceiro_amarelo": false,
+          "suspenso_causada": false,
+          "suspenso_cumprida": false
+        },
+        {
+          "data": "18/04/2026",
+          "adversario": "Forte FC",
+          "competicao": "Capixabão Sub-20",
+          "cor": "amarelo",
+          "terceiro_amarelo": false,
+          "suspenso_causada": false,
+          "suspenso_cumprida": false
+        },
+        {
+          "data": "06/05/2026",
+          "adversario": "Vitória-ES",
+          "competicao": "Capixabão Sub-20",
+          "cor": "amarelo",
+          "terceiro_amarelo": false,
+          "suspenso_causada": false,
+          "suspenso_cumprida": false
+        }
+      ],
+      "ogol_id": 3494740
+    },
+    "André": {
+      "amarelos": 0,
+      "vermelho": false,
+      "suspenso_proxima": false,
+      "historico": [
+        {
+          "data": "25/02/2026",
+          "adversario": "Sport Capixaba",
+          "competicao": "Capixabão Sub-20",
+          "cor": "amarelo",
+          "terceiro_amarelo": false,
+          "suspenso_causada": false,
+          "suspenso_cumprida": false
+        }
+      ],
+      "ogol_id": 3515122
+    },
+    "Kledyson": {
+      "amarelos": 1,
+      "vermelho": false,
+      "suspenso_proxima": false,
+      "historico": [
+        {
+          "data": "25/02/2026",
+          "adversario": "Sport Capixaba",
+          "competicao": "Capixabão Sub-20",
+          "cor": "amarelo",
+          "terceiro_amarelo": false,
+          "suspenso_causada": false,
+          "suspenso_cumprida": false
+        },
+        {
+          "data": "18/04/2026",
+          "adversario": "Forte FC",
+          "competicao": "Capixabão Sub-20",
+          "cor": "amarelo",
+          "terceiro_amarelo": false,
+          "suspenso_causada": false,
+          "suspenso_cumprida": false
+        }
+      ],
+      "ogol_id": 1458735
+    },
+    "Gustavo Pereira": {
+      "amarelos": 0,
+      "vermelho": false,
+      "suspenso_proxima": false,
+      "historico": [
+        {
+          "data": "25/02/2026",
+          "adversario": "Sport Capixaba",
+          "competicao": "Capixabão Sub-20",
+          "cor": "amarelo",
+          "terceiro_amarelo": false,
+          "suspenso_causada": false,
+          "suspenso_cumprida": false
+        },
+        {
+          "data": "28/02/2026",
+          "adversario": "EC Tupy",
+          "competicao": "Capixabão Sub-20",
+          "cor": "amarelo",
+          "terceiro_amarelo": false,
+          "suspenso_causada": false,
+          "suspenso_cumprida": false
+        }
+      ],
+      "ogol_id": 3515119
+    },
+    "Felipin": {
+      "amarelos": 0,
+      "vermelho": false,
+      "suspenso_proxima": false,
+      "historico": [
+        {
+          "data": "25/02/2026",
+          "adversario": "Sport Capixaba",
+          "competicao": "Capixabão Sub-20",
+          "cor": "amarelo",
+          "terceiro_amarelo": false,
+          "suspenso_causada": false,
+          "suspenso_cumprida": false
+        },
+        {
+          "data": "01/04/2026",
+          "adversario": "Porto Vitória",
+          "competicao": "Capixabão Sub-20",
+          "cor": "amarelo",
+          "terceiro_amarelo": false,
+          "suspenso_causada": false,
+          "suspenso_cumprida": false
+        }
+      ],
+      "ogol_id": 3515126
+    },
+    "Natan": {
+      "amarelos": 1,
+      "vermelho": true,
+      "suspenso_proxima": true,
+      "historico": [
+        {
+          "data": "28/02/2026",
+          "adversario": "EC Tupy",
+          "competicao": "Capixabão Sub-20",
+          "cor": "amarelo",
+          "terceiro_amarelo": false,
+          "suspenso_causada": false,
+          "suspenso_cumprida": false
+        },
+        {
+          "data": "06/03/2026",
+          "adversario": "Pinheiros-ES",
+          "competicao": "Capixabão Sub-20",
+          "cor": "amarelo",
+          "terceiro_amarelo": false,
+          "suspenso_causada": false,
+          "suspenso_cumprida": false
+        },
+        {
+          "data": "06/05/2026",
+          "adversario": "Vitória-ES",
+          "competicao": "Capixabão Sub-20",
+          "cor": "amarelo",
+          "terceiro_amarelo": false,
+          "suspenso_causada": false,
+          "suspenso_cumprida": false
+        },
+        {
+          "data": "06/05/2026",
+          "adversario": "Vitória-ES",
+          "competicao": "Capixabão Sub-20",
+          "cor": "vermelho",
+          "terceiro_amarelo": false,
+          "suspenso_causada": true,
+          "suspenso_cumprida": false
+        }
+      ],
+      "ogol_id": 3517563
+    },
+    "Irineu": {
+      "amarelos": 0,
+      "vermelho": false,
+      "suspenso_proxima": false,
+      "historico": [
+        {
+          "data": "28/02/2026",
+          "adversario": "EC Tupy",
+          "competicao": "Capixabão Sub-20",
+          "cor": "amarelo",
+          "terceiro_amarelo": false,
+          "suspenso_causada": false,
+          "suspenso_cumprida": false
+        },
+        {
+          "data": "04/04/2026",
+          "adversario": "Rio Branco-ES",
+          "competicao": "Capixabão Sub-20",
+          "cor": "amarelo",
+          "terceiro_amarelo": false,
+          "suspenso_causada": false,
+          "suspenso_cumprida": false
+        },
+        {
+          "data": "15/04/2026",
+          "adversario": "CTE Colatina",
+          "competicao": "Capixabão Sub-20",
+          "cor": "amarelo",
+          "terceiro_amarelo": true,
+          "suspenso_causada": true,
+          "suspenso_cumprida": false
+        }
+      ],
+      "ogol_id": 3517565
+    },
+    "Richardy": {
+      "amarelos": 1,
+      "vermelho": false,
+      "suspenso_proxima": false,
+      "historico": [
+        {
+          "data": "28/02/2026",
+          "adversario": "EC Tupy",
+          "competicao": "Capixabão Sub-20",
+          "cor": "amarelo",
+          "terceiro_amarelo": false,
+          "suspenso_causada": false,
+          "suspenso_cumprida": false
+        },
+        {
+          "data": "06/03/2026",
+          "adversario": "Pinheiros-ES",
+          "competicao": "Capixabão Sub-20",
+          "cor": "amarelo",
+          "terceiro_amarelo": false,
+          "suspenso_causada": false,
+          "suspenso_cumprida": false
+        },
+        {
+          "data": "25/03/2026",
+          "adversario": "Vitória-ES",
+          "competicao": "Capixabão Sub-20",
+          "cor": "amarelo",
+          "terceiro_amarelo": true,
+          "suspenso_causada": true,
+          "suspenso_cumprida": true
+        },
+        {
+          "data": "18/04/2026",
+          "adversario": "Forte FC",
+          "competicao": "Capixabão Sub-20",
+          "cor": "amarelo",
+          "terceiro_amarelo": false,
+          "suspenso_causada": false,
+          "suspenso_cumprida": false
+        }
+      ],
+      "ogol_id": 1204149
+    },
+    "Daniel Pereira": {
+      "amarelos": 0,
+      "vermelho": false,
+      "suspenso_proxima": false,
+      "historico": [
+        {
+          "data": "28/02/2026",
+          "adversario": "EC Tupy",
+          "competicao": "Capixabão Sub-20",
+          "cor": "amarelo",
+          "terceiro_amarelo": false,
+          "suspenso_causada": false,
+          "suspenso_cumprida": false
+        },
+        {
+          "data": "06/03/2026",
+          "adversario": "Pinheiros-ES",
+          "competicao": "Capixabão Sub-20",
+          "cor": "amarelo",
+          "terceiro_amarelo": false,
+          "suspenso_causada": false,
+          "suspenso_cumprida": false
+        }
+      ],
+      "ogol_id": 2539352
+    },
+    "João Luiz": {
+      "amarelos": 0,
+      "vermelho": false,
+      "suspenso_proxima": false,
+      "historico": [
+        {
+          "data": "06/03/2026",
+          "adversario": "Pinheiros-ES",
+          "competicao": "Capixabão Sub-20",
+          "cor": "amarelo",
+          "terceiro_amarelo": false,
+          "suspenso_causada": false,
+          "suspenso_cumprida": false
+        }
+      ],
+      "ogol_id": 3515129
+    },
+    "Luiz Antônio": {
+      "amarelos": 0,
+      "vermelho": false,
+      "suspenso_proxima": false,
+      "historico": [
+        {
+          "data": "06/03/2026",
+          "adversario": "Pinheiros-ES",
+          "competicao": "Capixabão Sub-20",
+          "cor": "amarelo",
+          "terceiro_amarelo": false,
+          "suspenso_causada": false,
+          "suspenso_cumprida": false
+        }
+      ],
+      "ogol_id": 3515130
+    },
+    "Fernando": {
+      "amarelos": 0,
+      "vermelho": false,
+      "suspenso_proxima": false,
+      "historico": [
+        {
+          "data": "06/03/2026",
+          "adversario": "Pinheiros-ES",
+          "competicao": "Capixabão Sub-20",
+          "cor": "amarelo",
+          "terceiro_amarelo": false,
+          "suspenso_causada": false,
+          "suspenso_cumprida": false
+        },
+        {
+          "data": "25/03/2026",
+          "adversario": "Vitória-ES",
+          "competicao": "Capixabão Sub-20",
+          "cor": "vermelho",
+          "terceiro_amarelo": false,
+          "suspenso_causada": true,
+          "suspenso_cumprida": true
+        },
+        {
+          "data": "04/04/2026",
+          "adversario": "Rio Branco-ES",
+          "competicao": "Capixabão Sub-20",
+          "cor": "amarelo",
+          "terceiro_amarelo": false,
+          "suspenso_causada": false,
+          "suspenso_cumprida": false
+        }
+      ],
+      "ogol_id": 3495276
+    },
+    "Robert": {
+      "amarelos": 1,
+      "vermelho": false,
+      "suspenso_proxima": false,
+      "historico": [
+        {
+          "data": "15/04/2026",
+          "adversario": "CTE Colatina",
+          "competicao": "Capixabão Sub-20",
+          "cor": "amarelo",
+          "terceiro_amarelo": false,
+          "suspenso_causada": false,
+          "suspenso_cumprida": false
+        },
+        {
+          "data": "18/04/2026",
+          "adversario": "Forte FC",
+          "competicao": "Capixabão Sub-20",
+          "cor": "amarelo",
+          "terceiro_amarelo": false,
+          "suspenso_causada": false,
+          "suspenso_cumprida": false
+        }
+      ],
+      "ogol_id": 3508193
+    },
+    "Kairon": {
+      "amarelos": 1,
+      "vermelho": false,
+      "suspenso_proxima": false,
+      "historico": [
+        {
+          "data": "18/04/2026",
+          "adversario": "Forte FC",
+          "competicao": "Capixabão Sub-20",
+          "cor": "amarelo",
+          "terceiro_amarelo": false,
+          "suspenso_causada": false,
+          "suspenso_cumprida": false
+        }
+      ],
+      "ogol_id": 1810054
+    },
+    "Negris": {
+      "amarelos": 2,
+      "vermelho": false,
+      "suspenso_proxima": false,
+      "historico": [
+        {
+          "data": "18/04/2026",
+          "adversario": "Forte FC",
+          "competicao": "Capixabão Sub-20",
+          "cor": "amarelo",
+          "terceiro_amarelo": false,
+          "suspenso_causada": false,
+          "suspenso_cumprida": false
+        },
+        {
+          "data": "06/05/2026",
+          "adversario": "Vitória-ES",
+          "competicao": "Capixabão Sub-20",
+          "cor": "amarelo",
+          "terceiro_amarelo": false,
+          "suspenso_causada": false,
+          "suspenso_cumprida": false
+        }
+      ],
+      "ogol_id": 2472707
+    },
+    "Arthur Pereira": {
+      "amarelos": 1,
+      "vermelho": false,
+      "suspenso_proxima": false,
+      "historico": [
+        {
+          "data": "18/04/2026",
+          "adversario": "Forte FC",
+          "competicao": "Capixabão Sub-20",
+          "cor": "amarelo",
+          "terceiro_amarelo": false,
+          "suspenso_causada": false,
+          "suspenso_cumprida": false
+        }
+      ],
+      "ogol_id": 2483114
+    },
+    "Jaelton": {
+      "amarelos": 1,
+      "vermelho": false,
+      "suspenso_proxima": false,
+      "historico": [
+        {
+          "data": "26/04/2026",
+          "adversario": "Vitória-ES",
+          "competicao": "Capixabão Sub-20",
+          "cor": "amarelo",
+          "terceiro_amarelo": false,
+          "suspenso_causada": false,
+          "suspenso_cumprida": false
+        }
+      ],
+      "ogol_id": 2782731
+    }
+  },
+  "datas_globais": [
+    "2026-02-25",
+    "2026-02-28",
+    "2026-03-06",
+    "2026-03-25",
+    "2026-04-01",
+    "2026-04-04",
+    "2026-04-15",
+    "2026-04-18",
+    "2026-04-26",
+    "2026-05-06"
+  ]
+}
