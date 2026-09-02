@@ -263,9 +263,10 @@ def carregar_bioimpedancia(categoria):
                 if pd.isna(val):
                     return None
                 return safe_float(val)
+            altura_cm = parse(row.get('altura_cm'))
             dados[nome] = {
                 'peso': parse(row.get('peso_kg')),
-                'altura': parse(row.get('altura_cm')) / 100.0 if parse(row.get('altura_cm')) else None,
+                'altura': altura_cm / 100.0 if altura_cm is not None else None,
                 'gordura': parse(row.get('gordura_corporal')),
                 'massa_magra': parse(row.get('massa_magra')),
                 'massa_muscular': parse(row.get('massa_muscular')),
