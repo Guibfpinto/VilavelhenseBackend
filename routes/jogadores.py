@@ -3,6 +3,7 @@ from services.dados import carregar_dados_elenco, carregar_lesoes, carregar_bioi
 from services.fotos import encontrar_foto_url
 from config import Config
 import numpy as np
+import pandas as pd
 
 bp = Blueprint('jogadores', __name__, url_prefix='/api/jogadores')
 
@@ -33,32 +34,11 @@ def get_jogadores(categoria):
 
     resultado = []
     for _, row in df.iterrows():
-        item = row.replace({np.nan: None}).to_dict()
+        # Converte NaN para None sem replace()
+        item = {k: (None if pd.isna(v) else v) for k, v in row.items()}
         nome_busca = item.get('apelido') or item.get('nome_completo')
         item['foto_url'] = encontrar_foto_url(categoria, nome_busca) if nome_busca else None
         item['atributos_fm26'] = agrupar_atributos_jogador(item)
         resultado.append(item)
 
-    return jsonify(resultado)
-
-@bp.route('/<categoria>/buscar', methods=['GET'])
-def buscar_jogador(categoria):
-    if categoria not in Config.CATEGORIAS_JOGADORES:
-        return jsonify({'error': 'Categoria inválida'}), 400
-    termo = request.args.get('q', '').strip().lower()
-    if not termo:
-        return jsonify([])
-    df = carregar_dados_elenco(categoria)
-    if df is None or df.empty:
-        return jsonify([])
-    mask = df['nome_completo'].str.lower().str.contains(termo, na=False) | \
-           df['apelido'].str.lower().str.contains(termo, na=False)
-    resultados = df[mask]
-    resultado = []
-    for _, row in resultados.head(50).iterrows():
-        item = row.replace({np.nan: None}).to_dict()
-        nome_busca = item.get('apelido') or item.get('nome_completo')
-        item['foto_url'] = encontrar_foto_url(categoria, nome_busca) if nome_busca else None
-        item['atributos_fm26'] = agrupar_atributos_jogador(item)
-        resultado.append(item)
     return jsonify(resultado)

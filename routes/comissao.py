@@ -4,6 +4,7 @@ from services.cartoes_service import carregar_cartoes, jogador_suspenso
 from services.fotos import encontrar_foto_url
 from config import Config
 import numpy as np
+import pandas as pd
 
 bp = Blueprint('comissao', __name__, url_prefix='/api/comissao')
 
@@ -21,7 +22,8 @@ def get_comissao(categoria):
 
     resultado = []
     for _, row in df.iterrows():
-        item = row.replace({np.nan: None}).to_dict()
+        # Converte NaN para None sem usar replace()
+        item = {k: (None if pd.isna(v) else v) for k, v in row.items()}
         nome_busca = item.get('nome')
         item['foto_url'] = encontrar_foto_url(categoria, nome_busca) if nome_busca else None
         item['cartoes'] = cartoes.get(item.get('nome_canonico'), {})
