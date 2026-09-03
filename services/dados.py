@@ -78,7 +78,18 @@ def carregar_dados_elenco(categoria):
         # Atributos FM26 também podem ter vírgula (mas geralmente são inteiros)
         for attr in Config.ATRIBUTOS_FM26_JOGADORES:
             if attr in df.columns:
+                # Converte para numérico (já existente)
                 df[attr] = parse_numero_coluna(df[attr])
+        
+                # Detecta a escala: se o valor máximo for > 100, assume escala 0-1000 e divide por 100
+                # Isso evita dividir atributos que já estejam na escala correta (0-20 ou 0-10)
+                if df[attr].notna().any():
+                    max_val = df[attr].max()
+                    if max_val > 100:
+                        df[attr] = df[attr] / 100.0
+                    elif max_val > 20:
+                        # Se estiver na escala 0-100, divide por 5 para 0-20
+                        df[attr] = df[attr] / 5.0
 
         # --- CÁLCULO DE IMC (com verificação de None) ---
         def calc_imc(row):

@@ -86,11 +86,9 @@ def buscar_jogador(categoria):
 
 @bp.route('/<categoria>/lesoes/<nome>', methods=['GET'])
 def get_lesoes_jogador(categoria, nome):
-    """Retorna o histórico de lesões formatado para um jogador."""
     if categoria not in Config.CATEGORIAS_JOGADORES:
         return jsonify({'error': 'Categoria inválida'}), 400
 
-    # Determina arquivo de lesões
     if categoria == 'profissional':
         csv_path = Config.ARQUIVOS_LESOES.get('profissional')
     elif categoria == 'sub20':
@@ -98,7 +96,6 @@ def get_lesoes_jogador(categoria, nome):
     else:
         return jsonify({'error': 'Categoria sem suporte para lesões'}), 400
 
-    # 🔧 Verificação de segurança
     if not csv_path or not os.path.exists(csv_path):
         return jsonify({'error': 'Arquivo de lesões não encontrado'}), 404
 
@@ -107,7 +104,6 @@ def get_lesoes_jogador(categoria, nome):
     except Exception as e:
         return jsonify({'error': f'Erro ao ler lesões: {str(e)}'}), 500
 
-    # Busca linha do jogador
     linha = df_lesoes[df_lesoes['nome_completo'] == nome]
     if linha.empty:
         return jsonify({'historico': 'Nenhum registro de lesão encontrado.'})
@@ -126,14 +122,14 @@ def get_lesoes_jogador(categoria, nome):
             ocorrencias = str(valor).split(',')
             ocorrencias_formatadas = []
             for occ in ocorrencias:
-                occ = occ.strip()
-                if ' - ' in occ:
-                    data_inicio_str, data_fim_str = occ.split(' - ', 1)
-                    ocorrencias_formatadas.append(f"{data_inicio_str} - {data_fim_str}")
-                elif '/' in occ and ' - ' not in occ and '–' not in occ:
-                    ocorrencias_formatadas.append(f"{occ} (atual)")
-                else:
+                occ = occ.strip().rstrip(';').strip()
+                # Verifica se tem separador de intervalo
+                if ' / ' in occ or ' - ' in occ or '–' in occ:
+                    # Já tem data fim, não adicionar "(atual)"
                     ocorrencias_formatadas.append(occ)
+                else:
+                    # Apenas uma data (lesão atual)
+                    ocorrencias_formatadas.append(f"{occ} (atual)")
             linhas.append(f"• {nome_lesao}: {', '.join(ocorrencias_formatadas)}")
     if not tem_lesao:
         return jsonify({'historico': 'Nenhuma lesão registrada.'})
