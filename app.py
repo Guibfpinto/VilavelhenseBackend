@@ -3,14 +3,30 @@
 from flask import Flask, jsonify
 from flask_cors import CORS
 from config import Config
-from routes import auth, jogadores, comissao, cartoes, partida, estatisticas, proximo_jogo
+
+# ========== IMPORTAÇÃO DE TODOS OS BLUEPRINTS ==========
+from routes import (
+    auth,
+    jogadores,
+    comissao,
+    cartoes,
+    partida,
+    estatisticas,
+    proximo_jogo,
+    gps,
+    jogos,
+    treinos,
+    wellbeing,
+    relatorios,                # blueprint principal de relatórios
+    relatorioswellbeing        # agora com nome único (relatorios_wellbeing)
+)
 
 app = Flask(__name__)
 app.config.from_object(Config)
 
 CORS(app, resources={r"/api/*": {"origins": app.config['CORS_ORIGINS']}})
 
-# Registra blueprints
+# ========== REGISTRO DOS BLUEPRINTS ==========
 app.register_blueprint(auth.bp)
 app.register_blueprint(jogadores.bp)
 app.register_blueprint(comissao.bp)
@@ -18,9 +34,14 @@ app.register_blueprint(cartoes.bp)
 app.register_blueprint(partida.bp)
 app.register_blueprint(estatisticas.bp)
 app.register_blueprint(proximo_jogo.bp)
-from routes.relatorios import bp as relatorios_bp
-app.register_blueprint(relatorios_bp)
+app.register_blueprint(gps.bp)
+app.register_blueprint(jogos.bp)
+app.register_blueprint(treinos.bp)
+app.register_blueprint(wellbeing.bp)
+app.register_blueprint(relatorios.bp)
+app.register_blueprint(relatorioswellbeing.bp)   # agora com nome único
 
+# ========== ROTA RAIZ ==========
 @app.route('/')
 def home():
     return jsonify({
@@ -37,11 +58,20 @@ def home():
             '/api/estatisticas/<categoria>/relatorio',
             '/api/estatisticas/<categoria>/posicao',
             '/api/estatisticas/<categoria>/condicao',
-            '/api/proximo_jogo'
+            '/api/proximo_jogo',
+            '/api/gps/<int:atleta_id>',
+            '/api/jogos/<int:atleta_id>',
+            '/api/treinos/<int:atleta_id>',
+            '/api/wellbeing/<int:atleta_id>',
+            '/api/relatorios/diretoria',
+            '/api/relatorios/jogador/<int:ogol_id>',
+            '/api/relatorios/comissao/<int:membro_id>',
+            '/api/relatorios/comissao/completo',
+            '/api/relatorios/wellbeing/<int:atleta_id>'   # nova rota
         ]
     })
 
-# Rota para servir fotos
+# ========== ROTA PARA FOTOS ==========
 @app.route('/fotos/<categoria>/<path:filename>')
 def serve_foto(categoria, filename):
     from flask import send_from_directory, abort
@@ -61,8 +91,8 @@ def serve_foto(categoria, filename):
     filename = os.path.basename(filename)  # segurança
     return send_from_directory(pasta, filename)
 
+# ========== EXECUÇÃO ==========
 if __name__ == '__main__':
-    # Cria arquivo de usuários se não existir
     from services.auth_service import carregar_usuarios
     carregar_usuarios()
     print("="*60)
