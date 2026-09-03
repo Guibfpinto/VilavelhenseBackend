@@ -27,16 +27,19 @@ class Config:
         'sub17': os.path.join(DATA_FOLDER, 'perfil_completo_jogadores_Sub17_2027.csv'),
         'comissao_profissional': os.path.join(DATA_FOLDER, 'perfil_completo_comissao_2027.csv'),
         'comissao_sub20': os.path.join(DATA_FOLDER, 'perfil_completo_comissao_Sub20_2027.csv'),
+        'comissao_sub17': os.path.join(DATA_FOLDER, 'perfil_completo_comissao_Sub17_2027.csv'),
     }
 
     ARQUIVOS_LESOES = {
         'profissional': os.path.join(DATA_FOLDER, 'jogadores_vilavelhense_profissional_lesoes.csv'),
         'sub20': os.path.join(DATA_FOLDER, 'jogadores_vilavelhense_Sub20_lesoes.csv'),
+        'sub17': os.path.join(DATA_FOLDER, 'jogadores_vilavelhense_Sub17_lesoes.csv'),
     }
 
     ARQUIVOS_BIO = {
         'profissional': os.path.join(DATA_FOLDER, 'jogadores_vilavelhense_profissional_Bioimpedancia.csv'),
         'sub20': os.path.join(DATA_FOLDER, 'jogadores_vilavelhense_Sub20_Bioimpedancia.csv'),
+        'sub17': os.path.join(DATA_FOLDER, 'jogadores_vilavelhense_Sub17_Bioimpedancia.csv'),
     }
 
     ARQUIVOS_CARTOES = {
@@ -47,6 +50,31 @@ class Config:
         'comissao_sub20': os.path.join(DATA_FOLDER, 'cartoes_acumulados_comissao_sub20.json'),
         'comissao_sub17': os.path.join(DATA_FOLDER, 'cartoes_acumulados_comissao_sub17.json'),
     }
+
+    # ============================================================
+    # PASTAS DE ESTATÍSTICAS (CSVs de partidas) – CADA CATEGORIA PODE TER MÚLTIPLAS PASTAS
+    # ============================================================
+    # Para jogadores
+    PASTA_ESTATISTICAS_PROFISSIONAL = [
+        os.path.join(DATA_FOLDER, 'estatisticas', 'profissional')
+    ]
+    PASTA_ESTATISTICAS_SUB20 = [
+        os.path.join(DATA_FOLDER, 'estatisticas', 'sub20')
+    ]
+    PASTA_ESTATISTICAS_SUB17 = [
+        os.path.join(DATA_FOLDER, 'estatisticas', 'sub17')
+    ]
+
+    # Para comissão técnica
+    PASTA_ESTATISTICAS_COMISSAO_PROFISSIONAL = [
+        os.path.join(DATA_FOLDER, 'estatisticas_comissao', 'profissional')
+    ]
+    PASTA_ESTATISTICAS_COMISSAO_SUB20 = [
+        os.path.join(DATA_FOLDER, 'estatisticas_comissao', 'sub20')
+    ]
+    PASTA_ESTATISTICAS_COMISSAO_SUB17 = [
+        os.path.join(DATA_FOLDER, 'estatisticas_comissao', 'sub17')
+    ]
 
     # ============================================================
     # BANCO SQLITE DE FALLBACK (para partidas)
@@ -121,3 +149,39 @@ class Config:
         'ambicao', 'lealdade', 'pressao', 'profissionalismo', 'espirito_esportivo',
         'temperamento', 'controversia', 'adaptabilidade_personalidade'
     ]
+
+    # ============================================================
+    # MAPEAMENTO DE ARQUIVOS POR CATEGORIA (para funções auxiliares)
+    # ============================================================
+    @classmethod
+    def get_csv_path(cls, categoria):
+        """Retorna o caminho do CSV principal de uma categoria (jogadores ou comissão)."""
+        return cls.ARQUIVOS_CSV.get(categoria)
+
+    @classmethod
+    def get_lesoes_path(cls, categoria):
+        """Retorna o caminho do CSV de lesões de uma categoria."""
+        return cls.ARQUIVOS_LESOES.get(categoria)
+
+    @classmethod
+    def get_bio_path(cls, categoria):
+        """Retorna o caminho do CSV de bioimpedância de uma categoria."""
+        return cls.ARQUIVOS_BIO.get(categoria)
+
+    @classmethod
+    def get_cartoes_path(cls, categoria):
+        """Retorna o caminho do arquivo JSON de cartões de uma categoria."""
+        return cls.ARQUIVOS_CARTOES.get(categoria)
+
+    @classmethod
+    def get_estatisticas_pastas(cls, categoria):
+        """Retorna a lista de pastas de estatísticas (CSVs de partidas) para uma categoria."""
+        mapa = {
+            'profissional': cls.PASTA_ESTATISTICAS_PROFISSIONAL,
+            'sub20': cls.PASTA_ESTATISTICAS_SUB20,
+            'sub17': cls.PASTA_ESTATISTICAS_SUB17,
+            'comissao_profissional': cls.PASTA_ESTATISTICAS_COMISSAO_PROFISSIONAL,
+            'comissao_sub20': cls.PASTA_ESTATISTICAS_COMISSAO_SUB20,
+            'comissao_sub17': cls.PASTA_ESTATISTICAS_COMISSAO_SUB17,
+        }
+        return mapa.get(categoria, [])
