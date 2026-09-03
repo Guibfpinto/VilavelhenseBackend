@@ -1,4 +1,4 @@
-# services/dados.py - Versão final com tratamento seguro de None e vírgula decimal
+# services/dados.py - Versão final com todos os atributos e estatísticas de temporada
 
 import os
 import pandas as pd
@@ -24,7 +24,6 @@ def parse_numero_coluna(serie):
     """Converte uma série pandas para numérico, tratando vírgula decimal e valores vazios."""
     if serie is None:
         return serie
-    # Converte para string, troca vírgula por ponto, substitui vazio por '0' e converte para float
     return pd.to_numeric(serie.astype(str).str.replace(',', '.').str.replace('', '0'), errors='coerce')
 
 def safe_divide(numerador, denominador):
@@ -32,6 +31,20 @@ def safe_divide(numerador, denominador):
     if denominador is None or pd.isna(denominador) or denominador == 0:
         return np.nan
     return numerador / denominador
+
+def limpar_numero(valor):
+    """Limpa e converte para número (int ou float) se possível, senão retorna o original."""
+    if pd.isna(valor) or valor is None:
+        return None
+    try:
+        # Remove espaços e substitui vírgula por ponto
+        v = str(valor).strip().replace(',', '.')
+        if '.' in v:
+            return float(v)
+        else:
+            return int(v)
+    except:
+        return valor
 
 # ============================================================================
 # FUNÇÕES DE CARREGAMENTO DE DADOS
@@ -75,23 +88,19 @@ def carregar_dados_elenco(categoria):
             if col in df.columns:
                 df[col] = parse_numero_coluna(df[col])
 
-        # Atributos FM26 também podem ter vírgula (mas geralmente são inteiros)
+        # Atributos FM26 também podem ter vírgula
         for attr in Config.ATRIBUTOS_FM26_JOGADORES:
             if attr in df.columns:
-                # Converte para numérico (já existente)
                 df[attr] = parse_numero_coluna(df[attr])
-        
-                # Detecta a escala: se o valor máximo for > 100, assume escala 0-1000 e divide por 100
-                # Isso evita dividir atributos que já estejam na escala correta (0-20 ou 0-10)
+                # Detecta escala: se máximo > 100, divide por 100; se > 20, divide por 5
                 if df[attr].notna().any():
                     max_val = df[attr].max()
                     if max_val > 100:
                         df[attr] = df[attr] / 100.0
                     elif max_val > 20:
-                        # Se estiver na escala 0-100, divide por 5 para 0-20
                         df[attr] = df[attr] / 5.0
 
-        # --- CÁLCULO DE IMC (com verificação de None) ---
+        # --- CÁLCULO DE IMC ---
         def calc_imc(row):
             altura = row.get('altura_cm')
             peso = row.get('peso_kg')
@@ -105,7 +114,7 @@ def carregar_dados_elenco(categoria):
         # --- IDADE ---
         df['Idade'] = df['data_nascimento'].apply(lambda x: calcular_idade(x) if pd.notna(x) else None)
 
-        # --- GORDURA CORPORAL ESTIMADA (com segurança) ---
+        # --- GORDURA CORPORAL ESTIMADA ---
         def calc_gordura(row):
             imc = row.get('IMC')
             idade = row.get('Idade')
@@ -115,7 +124,7 @@ def carregar_dados_elenco(categoria):
 
         df['Gordura_Corporal_%'] = df.apply(calc_gordura, axis=1)
 
-        # --- MASSA MAGRA E MUSCULAR ESTIMADAS (com segurança) ---
+        # --- MASSA MAGRA E MUSCULAR ---
         def calc_massa_magra(row):
             peso = row.get('peso_kg')
             gordura = row.get('Gordura_Corporal_%')
@@ -172,6 +181,9 @@ def carregar_dados_elenco(categoria):
         else:
             df['Rating_Geral_FM26'] = 50
 
+        # --- ATRIBUTOS AGRUPADOS ---
+        df['atributos_fm26'] = df.apply(agrupar_atributos_jogador, axis=1)
+
         # Remove linhas sem nome
         df = df[df['nome_completo'].notna()]
         print(f"✅ Elenco {categoria} carregado com {len(df)} jogadores.")
@@ -186,38 +198,74 @@ def carregar_dados_elenco(categoria):
 
 def carregar_dados_comissao(categoria):
     """
-    Carrega CSV da comissão técnica.
+    Carrega CSV da comissão técnica, com todos os atributos e estatísticas.
     """
     caminho = Config.ARQUIVOS_CSV.get(categoria)
     if not caminho or not os.path.exists(caminho):
+        print(f"Arquivo não encontrado: {caminho}")
         return None
     try:
-        df = pd.read_csv(caminho, sep=';', encoding='utf-8-sig')
+        df = pd.read_csv(caminho, sep=';', encoding='utf-8-sig', dtype=str)
         df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_')
+        # Nome
         if 'apelido' in df.columns:
             df['nome'] = df['apelido'].fillna('')
         elif 'nome_completo' in df.columns:
             df['nome'] = df['nome_completo'].fillna('')
+        else:
+            df['nome'] = ''
+        # Cargo
         if 'cargo' not in df.columns:
             df['cargo'] = 'Técnico'
+        # Idade
         if 'data_nascimento' in df.columns:
             df['idade'] = df['data_nascimento'].apply(lambda x: calcular_idade(x) if pd.notna(x) else None)
         else:
             df['idade'] = None
-        from services.cartoes_service import mapear_nome_para_canonico
-        df['nome_canonico'] = df['nome'].apply(mapear_nome_para_canonico)
+        # Cidade/UF
+        if 'cidade_nascimento' in df.columns and 'uf_nascimento' in df.columns:
+            df['cidade_uf'] = df['cidade_nascimento'].fillna('') + ', ' + df['uf_nascimento'].fillna('')
+            df['cidade_uf'] = df['cidade_uf'].str.rstrip(', ')
+        elif 'cidade_nascimento' in df.columns:
+            df['cidade_uf'] = df['cidade_nascimento'].fillna('')
+        else:
+            df['cidade_uf'] = 'N/I'
+        # País
+        if 'pais_nascimento' in df.columns:
+            df['pais'] = df['pais_nascimento'].fillna('N/I')
+        else:
+            df['pais'] = 'N/I'
+        # Históricos
+        for col in ['historico_jogador', 'historico_profissional']:
+            if col not in df.columns:
+                df[col] = ''
 
         # Converte colunas numéricas com vírgula
-        for col in ['ca', 'pa']:
+        colunas_numericas = ['ca', 'pa', 'reputacao_mundial', 'reputacao_atual', 'reputacao_local',
+                             'jogos_temporada', 'cartoes_amarelos_totais', 'cartoes_vermelhos_totais']
+        for col in colunas_numericas:
             if col in df.columns:
                 df[col] = parse_numero_coluna(df[col])
+
+        # --- ATRIBUTOS AGRUPADOS (TODOS OS PREFIXOS) ---
+        df['atributos_fm26'] = df.apply(agrupar_atributos_comissao, axis=1)
+
+        # --- NOME CANÔNICO para cartões ---
+        from services.cartoes_service import mapear_nome_para_canonico
+        df['nome_canonico'] = df['nome'].apply(mapear_nome_para_canonico)
 
         print(f"✅ Comissão {categoria} carregada com {len(df)} membros.")
         return df
     except Exception as e:
         print(f"❌ Erro ao carregar comissão {categoria}: {e}")
+        import traceback
+        traceback.print_exc()
         return None
 
+
+# ============================================================================
+# FUNÇÕES DE CARREGAMENTO DE LESÕES E BIOIMPEDÂNCIA
+# ============================================================================
 
 def carregar_lesoes(categoria):
     caminho = Config.ARQUIVOS_LESOES.get(categoria)
@@ -233,27 +281,16 @@ def carregar_lesoes(categoria):
             for col in df.columns[11:]:
                 valor = row.get(col, '')
                 if pd.notna(valor) and str(valor).strip():
-                    # Separa as ocorrências (vírgula)
                     ocorrencias = str(valor).split(',')
-                    # Pega a última ocorrência (lesão mais recente)
-                    ultima = ocorrencias[-1].strip()
-                    # Remove ponto e vírgula residual e espaços extras
-                    ultima_limpa = ultima.rstrip(';').strip()
-                    
-                    # Verifica se a última ocorrência tem um intervalo (data início e data fim)
-                    # Padrões possíveis: "2026-03-15 / 2026-05-09", "2026-03-15 - 2026-05-09"
+                    ultima = ocorrencias[-1].strip().rstrip(';').strip()
+                    # Verifica se há intervalo (data fim)
                     separadores = [' / ', ' - ', '–', ' a ']
                     tem_intervalo = False
                     for sep in separadores:
-                        if sep in ultima_limpa:
+                        if sep in ultima:
                             tem_intervalo = True
                             break
-                    
-                    if tem_intervalo:
-                        # Tem data de fim -> lesão encerrada, não considerar ativa
-                        continue
-                    else:
-                        # Apenas uma data -> lesão ativa
+                    if not tem_intervalo:
                         tem_lesao = True
                         break
             if tem_lesao:
@@ -284,7 +321,6 @@ def carregar_bioimpedancia(categoria):
             nome = row.get('nome_completo')
             if not nome:
                 continue
-            # Converte valores com vírgula usando safe_float
             def parse(val):
                 if pd.isna(val):
                     return None
@@ -305,37 +341,31 @@ def carregar_bioimpedancia(categoria):
 
 
 # ============================================================================
-# FUNÇÕES DE AGRUPAMENTO DE ATRIBUTOS FM26 (com verificação de existência)
+# FUNÇÕES DE AGRUPAMENTO DE ATRIBUTOS FM26
 # ============================================================================
 
 def agrupar_atributos_jogador(row):
     """
-    Agrupa atributos FM26 de um jogador por categoria, retornando apenas os que existem.
+    Agrupa atributos FM26 de um jogador por categoria.
     """
     atributos = {}
-    # Técnicos
     tecnicos = ['escanteios', 'cruzamentos', 'drible', 'finalizacao', 'primeiro_controle',
                 'cobranca_faltas', 'cabecada', 'chutes_longe', 'arremessos_laterais',
                 'marcacao', 'passe', 'cobranca_penaltis', 'desarme', 'tecnica']
     atributos['tecnicos'] = {a: row.get(a) for a in tecnicos if a in row and pd.notna(row.get(a))}
-    # Mentais
     mentais = ['agressividade', 'antecipacao', 'coragem', 'composicao', 'concentracao',
                'decisao', 'determinacao', 'criatividade', 'lideranca', 'movimentacao_sem_bola',
                'posicionamento', 'trabalho_equipe', 'visao_jogo', 'intensidade_trabalho']
     atributos['mentais'] = {a: row.get(a) for a in mentais if a in row and pd.notna(row.get(a))}
-    # Físicos
     fisicos = ['aceleracao', 'agilidade', 'equilibrio', 'altura_salto', 'condicao_fisica_natural',
                'velocidade_maxima', 'resistencia', 'forca_fisica']
     atributos['fisicos'] = {a: row.get(a) for a in fisicos if a in row and pd.notna(row.get(a))}
-    # Goleiro
     goleiro = ['reflexos', 'jogo_aereo_goleiro', 'defesas_goleiro', 'comando_area',
                'comunicacao_goleiro', 'chutes_goleiro', 'um_contra_um_goleiro', 'saida_gol',
                'tendencia_socar', 'arremessos_goleiro', 'excentricidade']
     atributos['goleiro'] = {a: row.get(a) for a in goleiro if a in row and pd.notna(row.get(a))}
-    # Ocultos
     ocultos = ['consistencia', 'jogo_sujo', 'jogos_importantes', 'propensao_lesao', 'versatilidade']
     atributos['ocultos'] = {a: row.get(a) for a in ocultos if a in row and pd.notna(row.get(a))}
-    # Personalidade
     personalidade = ['adaptabilidade', 'ambicao', 'lealdade', 'pressao', 'profissionalismo',
                      'esportividade', 'temperamento', 'controversia']
     atributos['personalidade'] = {a: row.get(a) for a in personalidade if a in row and pd.notna(row.get(a))}
@@ -344,31 +374,69 @@ def agrupar_atributos_jogador(row):
 
 def agrupar_atributos_comissao(row):
     """
-    Agrupa atributos FM26 de um membro da comissão por categoria.
+    Agrupa TODOS os atributos da comissão a partir do CSV, usando prefixos.
     """
-    atributos = {}
-    # Gerais
-    gerais = ['CA', 'PA', 'reputacao_mundial', 'reputacao_atual', 'reputacao_local',
-              'qualificacoes_treinador', 'jogos_selecao', 'gols_selecao']
-    atributos['gerais'] = {a: row.get(a) for a in gerais if a in row and pd.notna(row.get(a))}
-    # Treinamento
-    treinamento = ['treinamento_ataque', 'treinamento_defesa', 'treinamento_condicionamento',
-                   'treinamento_goleiros', 'treinamento_posse', 'treinamento_tatica',
-                   'treinamento_tecnico', 'treinamento_gestao_pessoas', 'treinamento_trabalho_jovens',
-                   'treinamento_bolas_paradas']
-    atributos['treinamento'] = {a: row.get(a) for a in treinamento if a in row and pd.notna(row.get(a))}
-    # Staff Mental
-    staff_mental = ['adaptabilidade_staff', 'determinacao_staff', 'avaliacao_habilidade_jogador',
-                    'avaliacao_potencial_jogador', 'avaliacao_habilidade_staff', 'negociacao',
-                    'autoridade', 'motivacao', 'fisioterapia', 'conhecimento_tatico']
-    atributos['staff_mental'] = {a: row.get(a) for a in staff_mental if a in row and pd.notna(row.get(a))}
-    # Táticas
-    taticas = ['tatica_ataque', 'profundidade', 'direcao', 'espetacularidade', 'flexibilidade',
-               'funcoes_livres', 'marcacao', 'impedimento', 'pressao', 'recuar',
-               'ritmo', 'uso_armador', 'uso_substituicoes', 'largura']
-    atributos['taticas'] = {a: row.get(a) for a in taticas if a in row and pd.notna(row.get(a))}
-    # Personalidade
-    personalidade = ['ambicao', 'lealdade', 'pressao', 'profissionalismo', 'espirito_esportivo',
-                     'temperamento', 'controversia', 'adaptabilidade_personalidade']
-    atributos['personalidade'] = {a: row.get(a) for a in personalidade if a in row and pd.notna(row.get(a))}
-    return atributos
+    atributos = {
+        'gerais': {},
+        'treinamento': {},
+        'staff_mental': {},
+        'nao_taticos': {},
+        'funcoes': {},
+        'taticas': {},
+        'scouting': {},
+        'medica': {},
+        'personalidade': {},
+    }
+
+    # Mapeamento de prefixos para categorias
+    prefix_map = {
+        'coachingattributes_': 'treinamento',
+        'staffmentalattributes_': 'staff_mental',
+        'nontacticalattributes_': 'nao_taticos',
+        'rolesattributes_': 'funcoes',
+        'tacticalattributes_': 'taticas',
+        'scoutingattributes_': 'scouting',
+        'medicalattributes_': 'medica',
+        'personalityattributes_': 'personalidade',
+    }
+
+    # Percorre todas as colunas do row
+    for col, value in row.items():
+        if pd.isna(value) or value == '':
+            continue
+        value_str = str(value).strip()
+        if value_str == '':
+            continue
+        # Converte para número se possível
+        try:
+            v_num = float(value_str.replace(',', '.'))
+            if v_num.is_integer():
+                value_display = int(v_num)
+            else:
+                value_display = round(v_num, 1)
+        except:
+            value_display = value_str
+
+        # Verifica prefixos
+        mapped = False
+        for prefix, category in prefix_map.items():
+            if col.startswith(prefix):
+                key = col[len(prefix):].replace('_', ' ').title()
+                atributos[category][key] = value_display
+                mapped = True
+                break
+
+        # Colunas avulsas
+        if not mapped:
+            if col in ['ca', 'pa', 'reputacao_mundial', 'reputacao_atual', 'reputacao_local']:
+                atributos['gerais'][col.upper()] = value_display
+            elif col == 'qualificacoes_treinador':
+                atributos['gerais']['Qualificação'] = value_display
+            elif col == 'jogos_selecao':
+                atributos['gerais']['Jogos na Seleção'] = value_display
+            elif col == 'gols_selecao':
+                atributos['gerais']['Gols na Seleção'] = value_display
+            # Adicione outras colunas avulsas se necessário
+
+    # Remove categorias vazias
+    return {k: v for k, v in atributos.items() if v}
