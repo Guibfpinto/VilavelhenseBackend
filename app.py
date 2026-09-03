@@ -18,6 +18,8 @@ app.register_blueprint(cartoes.bp)
 app.register_blueprint(partida.bp)
 app.register_blueprint(estatisticas.bp)
 app.register_blueprint(proximo_jogo.bp)
+from routes.relatorios import bp as relatorios_bp
+app.register_blueprint(relatorios_bp)
 
 @app.route('/')
 def home():
