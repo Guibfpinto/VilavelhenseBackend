@@ -1,28 +1,39 @@
 @echo off
-chcp 65001 > nul
-title Vilavelhense FC - Servidores
+title Vilavelhense FC - Servidores com Fallback
+
+REM ===== CONFIGURE AQUI OS IPs =====
+set "IP_CASA=192.168.1.107"
+set "IP_FACULDADE=172.27.60.223"
+
+REM ===== Testa conectividade com o IP de casa =====
+ping -n 1 %IP_CASA% > nul
+if %errorlevel% equ 0 (
+    set "HOST=%IP_CASA%"
+    echo ✅ Conectado em casa - usando IP: %HOST%
+) else (
+    set "HOST=%IP_FACULDADE%"
+    echo 🌐 Conectado na faculdade - usando IP: %HOST%
+)
+
+REM ===== Diretório do backend (ajuste se necessário) =====
+set "BACKEND_DIR=D:\VilavelhenseBackend"
+cd /d "%BACKEND_DIR%" || (
+    echo ❌ Diretório não encontrado!
+    pause
+    exit /b
+)
 
 echo ========================================
-echo  🚀 Iniciando Servidores do Vilavelhense
+echo  🚀 Iniciando Servidores em %HOST%
 echo ========================================
-echo.
 
-REM Ativa o ambiente virtual
-call .\venv\Scripts\Activate
-
-REM Inicia a FastAPI (porta 8000)
-start "FastAPI" .\venv\Scripts\python.exe -m uvicorn api:app --host 0.0.0.0 --port 8000 --reload
-
-REM Aguarda 3 segundos
+start "FastAPI" .\venv\Scripts\python.exe -m uvicorn api:app --host %HOST% --port 8000 --reload
 timeout /t 3 /nobreak > nul
-
-REM Inicia o Flask (porta 5000)
 start "Flask" .\venv\Scripts\python.exe app.py
 
 echo.
-echo ✅ Servidores iniciados!
-echo    FastAPI: http://localhost:8000
-echo    Flask:   http://localhost:5000
+echo ✅ Servidores rodando em %HOST%
+echo    FastAPI: http://%HOST%:8000
+echo    Flask:   http://%HOST%:5000
 echo.
-echo Pressione qualquer tecla para fechar esta janela...
-pause > nul
+pause
