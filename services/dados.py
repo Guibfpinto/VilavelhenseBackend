@@ -1,4 +1,4 @@
-# services/dados.py - Versão final com todos os atributos e estatísticas de temporada
+# services/dados.py - Versão final com estatísticas e atributos únicos
 
 import os
 import pandas as pd
@@ -6,6 +6,7 @@ import numpy as np
 from config import Config
 from utils.datas import calcular_idade
 from services.bioimpedancia import classif_imc, classif_gordura, estado_fisico
+from services.cartoes_service import mapear_nome_para_canonico
 
 # ============================================================================
 # FUNÇÕES AUXILIARES
@@ -32,28 +33,14 @@ def safe_divide(numerador, denominador):
         return np.nan
     return numerador / denominador
 
-def limpar_numero(valor):
-    """Limpa e converte para número (int ou float) se possível, senão retorna o original."""
-    if pd.isna(valor) or valor is None:
-        return None
-    try:
-        # Remove espaços e substitui vírgula por ponto
-        v = str(valor).strip().replace(',', '.')
-        if '.' in v:
-            return float(v)
-        else:
-            return int(v)
-    except:
-        return valor
-
 # ============================================================================
-# FUNÇÕES DE CARREGAMENTO DE DADOS
+# FUNÇÕES DE CARREGAMENTO DE DADOS (JOGADORES E COMISSÃO)
 # ============================================================================
 
 def carregar_dados_elenco(categoria):
     """
     Carrega o CSV do elenco de uma categoria (profissional, sub20, sub17).
-    Faz tratamento de vírgula decimal e calcula métricas com segurança.
+    Inclui estatísticas de temporada.
     """
     caminho = Config.ARQUIVOS_CSV.get(categoria)
     if not caminho or not os.path.exists(caminho):
@@ -61,7 +48,6 @@ def carregar_dados_elenco(categoria):
         return None
 
     try:
-        # Leitura do CSV
         df_raw = pd.read_csv(caminho, sep=';', dtype=str, encoding='utf-8-sig', header=None)
         cabecalhos_originais = df_raw.iloc[0].tolist()
         df = df_raw.iloc[1:].reset_index(drop=True)
@@ -82,17 +68,16 @@ def carregar_dados_elenco(categoria):
             nome_normalizado = str(nome_original).strip().replace('\ufeff', '').replace(' ', '_').lower()
             df.rename(columns={i: nome_normalizado}, inplace=True)
 
-        # --- CONVERSÃO DE COLUNAS NUMÉRICAS COM TRATAMENTO DE VÍRGULA ---
+        # --- CONVERSÃO DE COLUNAS NUMÉRICAS ---
         colunas_numericas = ['altura_cm', 'peso_kg', 'habilidade_atual', 'habilidade_potencial']
         for col in colunas_numericas:
             if col in df.columns:
                 df[col] = parse_numero_coluna(df[col])
 
-        # Atributos FM26 também podem ter vírgula
+        # Atributos FM26
         for attr in Config.ATRIBUTOS_FM26_JOGADORES:
             if attr in df.columns:
                 df[attr] = parse_numero_coluna(df[attr])
-                # Detecta escala: se máximo > 100, divide por 100; se > 20, divide por 5
                 if df[attr].notna().any():
                     max_val = df[attr].max()
                     if max_val > 100:
@@ -100,7 +85,26 @@ def carregar_dados_elenco(categoria):
                     elif max_val > 20:
                         df[attr] = df[attr] / 5.0
 
-        # --- CÁLCULO DE IMC ---
+        # --- ESTATÍSTICAS DE TEMPORADA (JOGADORES) ---
+        estatisticas_jogador = [
+            'jogos_temporada', 'gols_totais', 'assistencias_totais',
+            'cartoes_amarelos_totais', 'cartoes_vermelhos_totais',
+            'minutos_totais', 'media_minutos_por_jogo',
+            'chutes_totais', 'chutes_ao_gol_totais', 'desarmes_totais',
+            'interceptacoes_totais', 'passes_certos_totais', 'passes_chave_totais',
+            'defesas_totais', 'jogos_sem_sofrer_gols', 'gols_sofridos',
+            'participacoes_diretas', 'ogol_rating_estatisticas', 'ogol_aproveitamento'
+        ]
+        estatisticas_dict = {}
+        for col in estatisticas_jogador:
+            if col in df.columns:
+                estatisticas_dict[col] = parse_numero_coluna(df[col]).tolist()
+            else:
+                estatisticas_dict[col] = [None] * len(df)
+        for col, valores in estatisticas_dict.items():
+            df[col] = valores
+
+        # --- CÁLCULO DE IMC, IDADE, GORDURA, MASSA ---
         def calc_imc(row):
             altura = row.get('altura_cm')
             peso = row.get('peso_kg')
@@ -111,10 +115,8 @@ def carregar_dados_elenco(categoria):
         df['IMC'] = df.apply(calc_imc, axis=1)
         df['Classificacao_IMC'] = df['IMC'].apply(classif_imc)
 
-        # --- IDADE ---
         df['Idade'] = df['data_nascimento'].apply(lambda x: calcular_idade(x) if pd.notna(x) else None)
 
-        # --- GORDURA CORPORAL ESTIMADA ---
         def calc_gordura(row):
             imc = row.get('IMC')
             idade = row.get('Idade')
@@ -124,7 +126,6 @@ def carregar_dados_elenco(categoria):
 
         df['Gordura_Corporal_%'] = df.apply(calc_gordura, axis=1)
 
-        # --- MASSA MAGRA E MUSCULAR ---
         def calc_massa_magra(row):
             peso = row.get('peso_kg')
             gordura = row.get('Gordura_Corporal_%')
@@ -181,7 +182,7 @@ def carregar_dados_elenco(categoria):
         else:
             df['Rating_Geral_FM26'] = 50
 
-        # --- ATRIBUTOS AGRUPADOS ---
+        # --- AGRUPAMENTO DE ATRIBUTOS ---
         df['atributos_fm26'] = df.apply(agrupar_atributos_jogador, axis=1)
 
         # Remove linhas sem nome
@@ -198,61 +199,53 @@ def carregar_dados_elenco(categoria):
 
 def carregar_dados_comissao(categoria):
     """
-    Carrega CSV da comissão técnica, com todos os atributos e estatísticas.
+    Carrega CSV da comissão técnica, incluindo estatísticas e atributos.
     """
     caminho = Config.ARQUIVOS_CSV.get(categoria)
     if not caminho or not os.path.exists(caminho):
-        print(f"Arquivo não encontrado: {caminho}")
         return None
     try:
-        df = pd.read_csv(caminho, sep=';', encoding='utf-8-sig', dtype=str)
+        df = pd.read_csv(caminho, sep=';', encoding='utf-8-sig')
         df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_')
-        # Nome
+
+        # Padroniza nome
         if 'apelido' in df.columns:
             df['nome'] = df['apelido'].fillna('')
         elif 'nome_completo' in df.columns:
             df['nome'] = df['nome_completo'].fillna('')
         else:
             df['nome'] = ''
-        # Cargo
+
         if 'cargo' not in df.columns:
             df['cargo'] = 'Técnico'
-        # Idade
+
         if 'data_nascimento' in df.columns:
             df['idade'] = df['data_nascimento'].apply(lambda x: calcular_idade(x) if pd.notna(x) else None)
         else:
             df['idade'] = None
-        # Cidade/UF
-        if 'cidade_nascimento' in df.columns and 'uf_nascimento' in df.columns:
-            df['cidade_uf'] = df['cidade_nascimento'].fillna('') + ', ' + df['uf_nascimento'].fillna('')
-            df['cidade_uf'] = df['cidade_uf'].str.rstrip(', ')
-        elif 'cidade_nascimento' in df.columns:
-            df['cidade_uf'] = df['cidade_nascimento'].fillna('')
-        else:
-            df['cidade_uf'] = 'N/I'
-        # País
-        if 'pais_nascimento' in df.columns:
-            df['pais'] = df['pais_nascimento'].fillna('N/I')
-        else:
-            df['pais'] = 'N/I'
-        # Históricos
-        for col in ['historico_jogador', 'historico_profissional']:
-            if col not in df.columns:
-                df[col] = ''
 
-        # Converte colunas numéricas com vírgula
-        colunas_numericas = ['ca', 'pa', 'reputacao_mundial', 'reputacao_atual', 'reputacao_local',
-                             'jogos_temporada', 'cartoes_amarelos_totais', 'cartoes_vermelhos_totais']
-        for col in colunas_numericas:
+        # Nome canônico (para cartões)
+        df['nome_canonico'] = df['nome'].apply(mapear_nome_para_canonico)
+
+        # ===== ESTATÍSTICAS DE TEMPORADA (COMISSÃO) =====
+        # Lista de colunas de estatísticas que podem existir no CSV
+        colunas_estatisticas = [
+            'jogos_temporada', 'cartoes_amarelos_totais', 'cartoes_vermelhos_totais',
+            'media_cartoes_amarelos', 'media_cartoes_vermelhos'
+        ]
+        for col in colunas_estatisticas:
             if col in df.columns:
+                # Converte para numérico (tratando vírgula)
                 df[col] = parse_numero_coluna(df[col])
+            else:
+                # Se não existir, cria coluna com None
+                df[col] = None
 
-        # --- ATRIBUTOS AGRUPADOS (TODOS OS PREFIXOS) ---
+        # ===== ATRIBUTOS FM26 (COMISSÃO) =====
         df['atributos_fm26'] = df.apply(agrupar_atributos_comissao, axis=1)
 
-        # --- NOME CANÔNICO para cartões ---
-        from services.cartoes_service import mapear_nome_para_canonico
-        df['nome_canonico'] = df['nome'].apply(mapear_nome_para_canonico)
+        # ===== REMOVE ATRIBUTOS QUE FORAM AGRUPADOS (opcional, para não duplicar) =====
+        # (mantemos as colunas originais para referência, mas o frontend usará atributos_fm26)
 
         print(f"✅ Comissão {categoria} carregada com {len(df)} membros.")
         return df
@@ -264,84 +257,7 @@ def carregar_dados_comissao(categoria):
 
 
 # ============================================================================
-# FUNÇÕES DE CARREGAMENTO DE LESÕES E BIOIMPEDÂNCIA
-# ============================================================================
-
-def carregar_lesoes(categoria):
-    caminho = Config.ARQUIVOS_LESOES.get(categoria)
-    if not caminho or not os.path.exists(caminho):
-        return {}
-    try:
-        df = pd.read_csv(caminho, delimiter=';', encoding='utf-8-sig', dtype=str)
-        lesionados = {}
-        for _, row in df.iterrows():
-            nome = row.get('nome_completo')
-            ogol_id = row.get('ogol_id')
-            tem_lesao = False
-            for col in df.columns[11:]:
-                valor = row.get(col, '')
-                if pd.notna(valor) and str(valor).strip():
-                    ocorrencias = str(valor).split(',')
-                    ultima = ocorrencias[-1].strip().rstrip(';').strip()
-                    # Verifica se há intervalo (data fim)
-                    separadores = [' / ', ' - ', '–', ' a ']
-                    tem_intervalo = False
-                    for sep in separadores:
-                        if sep in ultima:
-                            tem_intervalo = True
-                            break
-                    if not tem_intervalo:
-                        tem_lesao = True
-                        break
-            if tem_lesao:
-                if ogol_id and pd.notna(ogol_id):
-                    try:
-                        lesionados[int(float(ogol_id))] = True
-                    except:
-                        pass
-                if nome:
-                    lesionados[nome] = True
-        return lesionados
-    except Exception as e:
-        print(f"❌ Erro ao carregar lesões {categoria}: {e}")
-        return {}
-
-
-def carregar_bioimpedancia(categoria):
-    """
-    Carrega dados de bioimpedância e retorna dicionário {nome: dados}.
-    """
-    caminho = Config.ARQUIVOS_BIO.get(categoria)
-    if not caminho or not os.path.exists(caminho):
-        return {}
-    try:
-        df = pd.read_csv(caminho, delimiter=';', encoding='utf-8-sig', dtype=str)
-        dados = {}
-        for _, row in df.iterrows():
-            nome = row.get('nome_completo')
-            if not nome:
-                continue
-            def parse(val):
-                if pd.isna(val):
-                    return None
-                return safe_float(val)
-            altura_cm = parse(row.get('altura_cm'))
-            dados[nome] = {
-                'peso': parse(row.get('peso_kg')),
-                'altura': altura_cm / 100.0 if altura_cm is not None else None,
-                'gordura': parse(row.get('gordura_corporal')),
-                'massa_magra': parse(row.get('massa_magra')),
-                'massa_muscular': parse(row.get('massa_muscular')),
-                'data_coleta': row.get('data_bioimpedancia')
-            }
-        return dados
-    except Exception as e:
-        print(f"❌ Erro ao carregar bioimpedância {categoria}: {e}")
-        return {}
-
-
-# ============================================================================
-# FUNÇÕES DE AGRUPAMENTO DE ATRIBUTOS FM26
+# FUNÇÕES DE AGRUPAMENTO DE ATRIBUTOS (COM CHAVES ÚNICAS)
 # ============================================================================
 
 def agrupar_atributos_jogador(row):
@@ -374,69 +290,177 @@ def agrupar_atributos_jogador(row):
 
 def agrupar_atributos_comissao(row):
     """
-    Agrupa TODOS os atributos da comissão a partir do CSV, usando prefixos.
+    Agrupa atributos FM26 da comissão por categoria, com chaves únicas (sem duplicação).
     """
-    atributos = {
-        'gerais': {},
-        'treinamento': {},
-        'staff_mental': {},
-        'nao_taticos': {},
-        'funcoes': {},
-        'taticas': {},
-        'scouting': {},
-        'medica': {},
-        'personalidade': {},
-    }
+    atributos = {}
+    # ---- Gerais ----
+    gerais = ['ca', 'pa', 'reputacao_mundial', 'reputacao_atual', 'reputacao_local',
+              'qualificacoes_treinador', 'jogos_selecao', 'gols_selecao']
+    atributos['gerais'] = {}
+    for a in gerais:
+        if a in row and pd.notna(row.get(a)):
+            chave = a.upper() if a in ['ca', 'pa'] else a.replace('_', ' ').title()
+            atributos['gerais'][chave] = row.get(a)
 
-    # Mapeamento de prefixos para categorias
-    prefix_map = {
-        'coachingattributes_': 'treinamento',
-        'staffmentalattributes_': 'staff_mental',
-        'nontacticalattributes_': 'nao_taticos',
-        'rolesattributes_': 'funcoes',
-        'tacticalattributes_': 'taticas',
-        'scoutingattributes_': 'scouting',
-        'medicalattributes_': 'medica',
-        'personalityattributes_': 'personalidade',
-    }
+    # ---- Treinamento (coaching) ----
+    coaching = [
+        'coachingattributes_attacking', 'coachingattributes_defending',
+        'coachingattributes_fitness', 'coachingattributes_goalkeeping',
+        'coachingattributes_possession', 'coachingattributes_player',
+        'coachingattributes_tactical', 'coachingattributes_technical',
+        'coachingattributes_peoplemanagement', 'coachingattributes_workingwithyoungsters',
+        'coachingattributes_dirtinessallowance', 'coachingattributes_versatility',
+        'coachingattributes_setpieces'
+    ]
+    atributos['treinamento'] = {}
+    for a in coaching:
+        if a in row and pd.notna(row.get(a)):
+            chave = a.replace('coachingattributes_', '').replace('_', ' ').title()
+            atributos['treinamento'][chave] = row.get(a)
 
-    # Percorre todas as colunas do row
-    for col, value in row.items():
-        if pd.isna(value) or value == '':
-            continue
-        value_str = str(value).strip()
-        if value_str == '':
-            continue
-        # Converte para número se possível
-        try:
-            v_num = float(value_str.replace(',', '.'))
-            if v_num.is_integer():
-                value_display = int(v_num)
-            else:
-                value_display = round(v_num, 1)
-        except:
-            value_display = value_str
+    # ---- Staff Mental ----
+    staff_mental = [
+        'staffmentalattributes_adaptability', 'staffmentalattributes_determination',
+        'staffmentalattributes_judgingplayerability', 'staffmentalattributes_judgingplayerpotential',
+        'staffmentalattributes_judgingstaffability', 'staffmentalattributes_negotiating',
+        'staffmentalattributes_authority', 'staffmentalattributes_motivating',
+        'staffmentalattributes_physiotherapy', 'staffmentalattributes_tacticalknowledge'
+    ]
+    atributos['staff_mental'] = {}
+    for a in staff_mental:
+        if a in row and pd.notna(row.get(a)):
+            chave = a.replace('staffmentalattributes_', '').replace('_', ' ').title()
+            atributos['staff_mental'][chave] = row.get(a)
 
-        # Verifica prefixos
-        mapped = False
-        for prefix, category in prefix_map.items():
-            if col.startswith(prefix):
-                key = col[len(prefix):].replace('_', ' ').title()
-                atributos[category][key] = value_display
-                mapped = True
-                break
+    # ---- Táticas ----
+    taticas = [
+        'tacticalattributes_attacking', 'tacticalattributes_depth',
+        'tacticalattributes_directness', 'tacticalattributes_flamboyancy',
+        'tacticalattributes_flexibility', 'tacticalattributes_freeroles',
+        'tacticalattributes_marking', 'tacticalattributes_offside',
+        'tacticalattributes_pressing', 'tacticalattributes_sittingback',
+        'tacticalattributes_tempo', 'tacticalattributes_useofplaymaker',
+        'tacticalattributes_useofsubstitutions', 'tacticalattributes_width'
+    ]
+    atributos['taticas'] = {}
+    for a in taticas:
+        if a in row and pd.notna(row.get(a)):
+            chave = a.replace('tacticalattributes_', '').replace('_', ' ').title()
+            atributos['taticas'][chave] = row.get(a)
 
-        # Colunas avulsas
-        if not mapped:
-            if col in ['ca', 'pa', 'reputacao_mundial', 'reputacao_atual', 'reputacao_local']:
-                atributos['gerais'][col.upper()] = value_display
-            elif col == 'qualificacoes_treinador':
-                atributos['gerais']['Qualificação'] = value_display
-            elif col == 'jogos_selecao':
-                atributos['gerais']['Jogos na Seleção'] = value_display
-            elif col == 'gols_selecao':
-                atributos['gerais']['Gols na Seleção'] = value_display
-            # Adicione outras colunas avulsas se necessário
+    # ---- Scouting ----
+    scouting = [
+        'scoutingattributes_judgingplayerdata', 'scoutingattributes_judgingteamdata',
+        'scoutingattributes_presentingdata'
+    ]
+    atributos['scouting'] = {}
+    for a in scouting:
+        if a in row and pd.notna(row.get(a)):
+            chave = a.replace('scoutingattributes_', '').replace('_', ' ').title()
+            atributos['scouting'][chave] = row.get(a)
+
+    # ---- Médica ----
+    if 'medicalattributes_sportsscience' in row and pd.notna(row.get('medicalattributes_sportsscience')):
+        atributos['medica'] = {'Sports Science': row.get('medicalattributes_sportsscience')}
+
+    # ---- Personalidade ----
+    personalidade = [
+        'personalityattributes_adaptability', 'personalityattributes_ambition',
+        'personalityattributes_loyalty', 'personalityattributes_pressure',
+        'personalityattributes_professional', 'personalityattributes_sportsmanship',
+        'personalityattributes_temperament', 'personalityattributes_controversy'
+    ]
+    atributos['personalidade'] = {}
+    for a in personalidade:
+        if a in row and pd.notna(row.get(a)):
+            chave = a.replace('personalityattributes_', '').replace('_', ' ').title()
+            atributos['personalidade'][chave] = row.get(a)
+
+    # ---- Funções (roles) ----
+    roles = [
+        'rolesattributes_assistantmanager', 'rolesattributes_coach',
+        'rolesattributes_fitnesscoach', 'rolesattributes_goalkeepingcoach',
+        'rolesattributes_manager', 'rolesattributes_physio', 'rolesattributes_scout',
+        'rolesattributes_chairman', 'rolesattributes_directoroffootball',
+        'rolesattributes_headofyouthdevelopment', 'rolesattributes_dataanalyst',
+        'rolesattributes_sportsscientist', 'rolesattributes_loanmanager',
+        'rolesattributes_technicaldirector', 'rolesattributes_setpiececoach'
+    ]
+    atributos['funcoes'] = {}
+    for a in roles:
+        if a in row and pd.notna(row.get(a)):
+            chave = a.replace('rolesattributes_', '').replace('_', ' ').title()
+            atributos['funcoes'][chave] = row.get(a)
 
     # Remove categorias vazias
     return {k: v for k, v in atributos.items() if v}
+
+
+# ============================================================================
+# FUNÇÕES DE LESÕES E BIOIMPEDÂNCIA (MANTIDAS)
+# ============================================================================
+
+def carregar_lesoes(categoria):
+    caminho = Config.ARQUIVOS_LESOES.get(categoria)
+    if not caminho or not os.path.exists(caminho):
+        return {}
+    try:
+        df = pd.read_csv(caminho, delimiter=';', encoding='utf-8-sig', dtype=str)
+        lesionados = {}
+        for _, row in df.iterrows():
+            nome = row.get('nome_completo')
+            ogol_id = row.get('ogol_id')
+            tem_lesao = False
+            for col in df.columns[11:]:
+                valor = row.get(col, '')
+                if pd.notna(valor) and str(valor).strip():
+                    ocorrencias = str(valor).split(',')
+                    ultima = ocorrencias[-1].strip()
+                    ultima_limpa = ultima.rstrip(';').strip()
+                    separadores = [' / ', ' - ', '–', ' a ']
+                    tem_intervalo = any(sep in ultima_limpa for sep in separadores)
+                    if not tem_intervalo:
+                        tem_lesao = True
+                        break
+            if tem_lesao:
+                if ogol_id and pd.notna(ogol_id):
+                    try:
+                        lesionados[int(float(ogol_id))] = True
+                    except:
+                        pass
+                if nome:
+                    lesionados[nome] = True
+        return lesionados
+    except Exception as e:
+        print(f"❌ Erro ao carregar lesões {categoria}: {e}")
+        return {}
+
+
+def carregar_bioimpedancia(categoria):
+    caminho = Config.ARQUIVOS_BIO.get(categoria)
+    if not caminho or not os.path.exists(caminho):
+        return {}
+    try:
+        df = pd.read_csv(caminho, delimiter=';', encoding='utf-8-sig', dtype=str)
+        dados = {}
+        for _, row in df.iterrows():
+            nome = row.get('nome_completo')
+            if not nome:
+                continue
+            def parse(val):
+                if pd.isna(val):
+                    return None
+                return safe_float(val)
+            altura_cm = parse(row.get('altura_cm'))
+            dados[nome] = {
+                'peso': parse(row.get('peso_kg')),
+                'altura': altura_cm / 100.0 if altura_cm is not None else None,
+                'gordura': parse(row.get('gordura_corporal')),
+                'massa_magra': parse(row.get('massa_magra')),
+                'massa_muscular': parse(row.get('massa_muscular')),
+                'data_coleta': row.get('data_bioimpedancia')
+            }
+        return dados
+    except Exception as e:
+        print(f"❌ Erro ao carregar bioimpedância {categoria}: {e}")
+        return {}
