@@ -17,8 +17,7 @@ from routes import (
     jogos,
     treinos,
     wellbeing,
-    relatorios,                # blueprint principal de relatórios
-    relatorioswellbeing        # agora com nome único (relatorios_wellbeing)
+    relatorios,                # Blueprint unificado (contém todas as rotas de relatório)
 )
 
 app = Flask(__name__)
@@ -38,8 +37,7 @@ app.register_blueprint(gps.bp)
 app.register_blueprint(jogos.bp)
 app.register_blueprint(treinos.bp)
 app.register_blueprint(wellbeing.bp)
-app.register_blueprint(relatorios.bp)
-app.register_blueprint(relatorioswellbeing.bp)   # agora com nome único
+app.register_blueprint(relatorios.bp)   # Agora único, sem conflito
 
 # ========== ROTA RAIZ ==========
 @app.route('/')
@@ -67,7 +65,7 @@ def home():
             '/api/relatorios/jogador/<int:ogol_id>',
             '/api/relatorios/comissao/<int:membro_id>',
             '/api/relatorios/comissao/completo',
-            '/api/relatorios/wellbeing/<int:atleta_id>'   # nova rota
+            '/api/relatorios/wellbeing/<int:atleta_id>'
         ]
     })
 
