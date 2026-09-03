@@ -65,9 +65,16 @@ def home():
             '/api/relatorios/jogador/<int:ogol_id>',
             '/api/relatorios/comissao/<int:membro_id>',
             '/api/relatorios/comissao/completo',
-            '/api/relatorios/wellbeing/<int:atleta_id>'
+            '/api/relatorios/wellbeing/<int:atleta_id>',
+            '/api/health'    # Rota de health check para o fallback
         ]
     })
+
+# ========== ROTA DE HEALTH CHECK (para fallback do app) ==========
+@app.route('/api/health')
+def health():
+    """Endpoint simples para verificar se o servidor está ativo."""
+    return jsonify({'status': 'ok'})
 
 # ========== ROTA PARA FOTOS ==========
 @app.route('/fotos/<categoria>/<path:filename>')
