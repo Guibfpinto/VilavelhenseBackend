@@ -209,9 +209,6 @@ def carregar_dados_comissao(categoria):
 
 
 def carregar_lesoes(categoria):
-    """
-    Carrega o arquivo de lesões e retorna dicionário {nome/ogol_id: True} para lesionados ativos.
-    """
     caminho = Config.ARQUIVOS_LESOES.get(categoria)
     if not caminho or not os.path.exists(caminho):
         return {}
@@ -225,9 +222,27 @@ def carregar_lesoes(categoria):
             for col in df.columns[11:]:
                 valor = row.get(col, '')
                 if pd.notna(valor) and str(valor).strip():
+                    # Separa as ocorrências (vírgula)
                     ocorrencias = str(valor).split(',')
+                    # Pega a última ocorrência (lesão mais recente)
                     ultima = ocorrencias[-1].strip()
-                    if '/' not in ultima and '-' not in ultima:
+                    # Remove ponto e vírgula residual e espaços extras
+                    ultima_limpa = ultima.rstrip(';').strip()
+                    
+                    # Verifica se a última ocorrência tem um intervalo (data início e data fim)
+                    # Padrões possíveis: "2026-03-15 / 2026-05-09", "2026-03-15 - 2026-05-09"
+                    separadores = [' / ', ' - ', '–', ' a ']
+                    tem_intervalo = False
+                    for sep in separadores:
+                        if sep in ultima_limpa:
+                            tem_intervalo = True
+                            break
+                    
+                    if tem_intervalo:
+                        # Tem data de fim -> lesão encerrada, não considerar ativa
+                        continue
+                    else:
+                        # Apenas uma data -> lesão ativa
                         tem_lesao = True
                         break
             if tem_lesao:
