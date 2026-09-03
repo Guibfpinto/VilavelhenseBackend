@@ -1,4 +1,4 @@
-# services/dados.py - Versão final com estatísticas e atributos únicos
+# services/dados.py - Versão final com estatísticas, atributos únicos e tradução para português
 
 import os
 import pandas as pd
@@ -7,6 +7,98 @@ from config import Config
 from utils.datas import calcular_idade
 from services.bioimpedancia import classif_imc, classif_gordura, estado_fisico
 from services.cartoes_service import mapear_nome_para_canonico
+
+# ============================================================================
+# TRADUÇÃO DE ATRIBUTOS DE STAFF (FM26) - PORTUGUÊS
+# ============================================================================
+
+TRADUCAO_ATRIBUTOS_STAFF = {
+    # Gerais
+    'Ca': 'CA',
+    'Pa': 'PA',
+    'Reputacao Mundial': 'Reputação Mundial',
+    'Reputacao Atual': 'Reputação Atual',
+    'Reputacao Local': 'Reputação Local',
+    'Qualificacoes Treinador': 'Qualificações Treinador',
+    'Jogos Selecao': 'Jogos na Seleção',
+    'Gols Selecao': 'Gols na Seleção',
+
+    # Treinamento (coaching)
+    'Attacking': 'Ataque',
+    'Defending': 'Defesa',
+    'Fitness': 'Condicionamento',
+    'Goalkeeping': 'Goleiros',
+    'Possession': 'Posse de Bola',
+    'Player': 'Jogadores',
+    'Tactical': 'Tática',
+    'Technical': 'Técnica',
+    'Peoplemanagement': 'Gestão de Pessoas',
+    'Workingwithyoungsters': 'Trabalho com Jovens',
+    'Dirtinessallowance': 'Tolerância à Sujeira',
+    'Versatility': 'Versatilidade',
+    'Setpieces': 'Bolas Paradas',
+
+    # Staff Mental
+    'Adaptability': 'Adaptabilidade',
+    'Determination': 'Determinação',
+    'Judgingplayerability': 'Avaliação Habilidade',
+    'Judgingplayerpotential': 'Avaliação Potencial',
+    'Judgingstaffability': 'Avaliação Staff',
+    'Negotiating': 'Negociação',
+    'Authority': 'Autoridade',
+    'Motivating': 'Motivação',
+    'Physiotherapy': 'Fisioterapia',
+    'Tacticalknowledge': 'Conhecimento Tático',
+
+    # Táticas
+    'Depth': 'Profundidade',
+    'Directness': 'Objetividade',
+    'Flamboyancy': 'Efebismo',
+    'Flexibility': 'Flexibilidade',
+    'Freeroles': 'Funções Livres',
+    'Marking': 'Marcação',
+    'Offside': 'Impedimento',
+    'Pressing': 'Pressão',
+    'Sittingback': 'Recuo',
+    'Tempo': 'Ritmo',
+    'Useofplaymaker': 'Uso do Armador',
+    'Useofsubstitutions': 'Uso de Substituições',
+    'Width': 'Largura',
+
+    # Scouting
+    'Judgingplayerdata': 'Avaliação Dados Jogador',
+    'Judgingteamdata': 'Avaliação Dados Time',
+    'Presentingdata': 'Apresentação de Dados',
+
+    # Médica
+    'Sports Science': 'Ciência do Esporte',
+
+    # Personalidade
+    'Ambition': 'Ambição',
+    'Loyalty': 'Lealdade',
+    'Pressure': 'Pressão',
+    'Professional': 'Profissionalismo',
+    'Sportsmanship': 'Espírito Esportivo',
+    'Temperament': 'Temperamento',
+    'Controversy': 'Controvérsia',
+
+    # Funções (roles)
+    'Assistantmanager': 'Auxiliar Técnico',
+    'Coach': 'Treinador',
+    'Fitnesscoach': 'Preparador Físico',
+    'Goalkeepingcoach': 'Preparador de Goleiros',
+    'Manager': 'Técnico Principal',
+    'Physio': 'Fisioterapeuta',
+    'Scout': 'Olheiro',
+    'Chairman': 'Presidente',
+    'Directoroffootball': 'Diretor de Futebol',
+    'Headofyouthdevelopment': 'Coordenador de Base',
+    'Dataanalyst': 'Analista de Dados',
+    'Sportsscientist': 'Cientista do Esporte',
+    'Loanmanager': 'Gerente de Empréstimos',
+    'Technicaldirector': 'Diretor Técnico',
+    'Setpiececoach': 'Treinador de Bolas Paradas',
+}
 
 # ============================================================================
 # FUNÇÕES AUXILIARES
@@ -95,14 +187,11 @@ def carregar_dados_elenco(categoria):
             'defesas_totais', 'jogos_sem_sofrer_gols', 'gols_sofridos',
             'participacoes_diretas', 'ogol_rating_estatisticas', 'ogol_aproveitamento'
         ]
-        estatisticas_dict = {}
         for col in estatisticas_jogador:
             if col in df.columns:
-                estatisticas_dict[col] = parse_numero_coluna(df[col]).tolist()
+                df[col] = parse_numero_coluna(df[col])
             else:
-                estatisticas_dict[col] = [None] * len(df)
-        for col, valores in estatisticas_dict.items():
-            df[col] = valores
+                df[col] = 0
 
         # --- CÁLCULO DE IMC, IDADE, GORDURA, MASSA ---
         def calc_imc(row):
@@ -199,13 +288,14 @@ def carregar_dados_elenco(categoria):
 
 def carregar_dados_comissao(categoria):
     """
-    Carrega CSV da comissão técnica, incluindo estatísticas e atributos.
+    Carrega CSV da comissão técnica, incluindo estatísticas e atributos traduzidos.
     """
     caminho = Config.ARQUIVOS_CSV.get(categoria)
     if not caminho or not os.path.exists(caminho):
         return None
+
     try:
-        df = pd.read_csv(caminho, sep=';', encoding='utf-8-sig')
+        df = pd.read_csv(caminho, sep=';', encoding='utf-8-sig', dtype=str)
         df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_')
 
         # Padroniza nome
@@ -228,27 +318,28 @@ def carregar_dados_comissao(categoria):
         df['nome_canonico'] = df['nome'].apply(mapear_nome_para_canonico)
 
         # ===== ESTATÍSTICAS DE TEMPORADA (COMISSÃO) =====
-        # Lista de colunas de estatísticas que podem existir no CSV
-        colunas_estatisticas = [
-            'jogos_temporada', 'cartoes_amarelos_totais', 'cartoes_vermelhos_totais',
-            'media_cartoes_amarelos', 'media_cartoes_vermelhos'
-        ]
-        for col in colunas_estatisticas:
-            if col in df.columns:
-                # Converte para numérico (tratando vírgula)
-                df[col] = parse_numero_coluna(df[col])
+        estatisticas_comissao = {
+            'jogos_temporada': 'jogos_temporada',
+            'cartoes_amarelos_totais': 'cartoes_amarelos_totais',
+            'cartoes_vermelhos_totais': 'cartoes_vermelhos_totais',
+            'media_cartoes_amarelos': 'media_cartoes_amarelos',
+            'media_cartoes_vermelhos': 'media_cartoes_vermelhos'
+        }
+
+        for col, original in estatisticas_comissao.items():
+            if original in df.columns:
+                df[col] = pd.to_numeric(df[original].str.replace(',', '.'), errors='coerce')
+                if 'jogos' in col or 'cartoes' in col:
+                    df[col] = df[col].fillna(0).astype(int)
             else:
-                # Se não existir, cria coluna com None
-                df[col] = None
+                df[col] = 0
 
-        # ===== ATRIBUTOS FM26 (COMISSÃO) =====
+        # ===== ATRIBUTOS FM26 (COMISSÃO) COM TRADUÇÃO =====
         df['atributos_fm26'] = df.apply(agrupar_atributos_comissao, axis=1)
-
-        # ===== REMOVE ATRIBUTOS QUE FORAM AGRUPADOS (opcional, para não duplicar) =====
-        # (mantemos as colunas originais para referência, mas o frontend usará atributos_fm26)
 
         print(f"✅ Comissão {categoria} carregada com {len(df)} membros.")
         return df
+
     except Exception as e:
         print(f"❌ Erro ao carregar comissão {categoria}: {e}")
         import traceback
@@ -257,7 +348,7 @@ def carregar_dados_comissao(categoria):
 
 
 # ============================================================================
-# FUNÇÕES DE AGRUPAMENTO DE ATRIBUTOS (COM CHAVES ÚNICAS)
+# FUNÇÕES DE AGRUPAMENTO DE ATRIBUTOS (COM CHAVES ÚNICAS E TRADUÇÃO)
 # ============================================================================
 
 def agrupar_atributos_jogador(row):
@@ -290,17 +381,19 @@ def agrupar_atributos_jogador(row):
 
 def agrupar_atributos_comissao(row):
     """
-    Agrupa atributos FM26 da comissão por categoria, com chaves únicas (sem duplicação).
+    Agrupa atributos FM26 da comissão por categoria, com chaves únicas e nomes traduzidos para português.
     """
     atributos = {}
+
     # ---- Gerais ----
     gerais = ['ca', 'pa', 'reputacao_mundial', 'reputacao_atual', 'reputacao_local',
               'qualificacoes_treinador', 'jogos_selecao', 'gols_selecao']
     atributos['gerais'] = {}
     for a in gerais:
         if a in row and pd.notna(row.get(a)):
-            chave = a.upper() if a in ['ca', 'pa'] else a.replace('_', ' ').title()
-            atributos['gerais'][chave] = row.get(a)
+            chave_original = a.upper() if a in ['ca', 'pa'] else a.replace('_', ' ').title()
+            chave_traduzida = TRADUCAO_ATRIBUTOS_STAFF.get(chave_original, chave_original)
+            atributos['gerais'][chave_traduzida] = row.get(a)
 
     # ---- Treinamento (coaching) ----
     coaching = [
@@ -315,8 +408,9 @@ def agrupar_atributos_comissao(row):
     atributos['treinamento'] = {}
     for a in coaching:
         if a in row and pd.notna(row.get(a)):
-            chave = a.replace('coachingattributes_', '').replace('_', ' ').title()
-            atributos['treinamento'][chave] = row.get(a)
+            chave_original = a.replace('coachingattributes_', '').replace('_', ' ').title()
+            chave_traduzida = TRADUCAO_ATRIBUTOS_STAFF.get(chave_original, chave_original)
+            atributos['treinamento'][chave_traduzida] = row.get(a)
 
     # ---- Staff Mental ----
     staff_mental = [
@@ -329,8 +423,9 @@ def agrupar_atributos_comissao(row):
     atributos['staff_mental'] = {}
     for a in staff_mental:
         if a in row and pd.notna(row.get(a)):
-            chave = a.replace('staffmentalattributes_', '').replace('_', ' ').title()
-            atributos['staff_mental'][chave] = row.get(a)
+            chave_original = a.replace('staffmentalattributes_', '').replace('_', ' ').title()
+            chave_traduzida = TRADUCAO_ATRIBUTOS_STAFF.get(chave_original, chave_original)
+            atributos['staff_mental'][chave_traduzida] = row.get(a)
 
     # ---- Táticas ----
     taticas = [
@@ -345,8 +440,9 @@ def agrupar_atributos_comissao(row):
     atributos['taticas'] = {}
     for a in taticas:
         if a in row and pd.notna(row.get(a)):
-            chave = a.replace('tacticalattributes_', '').replace('_', ' ').title()
-            atributos['taticas'][chave] = row.get(a)
+            chave_original = a.replace('tacticalattributes_', '').replace('_', ' ').title()
+            chave_traduzida = TRADUCAO_ATRIBUTOS_STAFF.get(chave_original, chave_original)
+            atributos['taticas'][chave_traduzida] = row.get(a)
 
     # ---- Scouting ----
     scouting = [
@@ -356,12 +452,15 @@ def agrupar_atributos_comissao(row):
     atributos['scouting'] = {}
     for a in scouting:
         if a in row and pd.notna(row.get(a)):
-            chave = a.replace('scoutingattributes_', '').replace('_', ' ').title()
-            atributos['scouting'][chave] = row.get(a)
+            chave_original = a.replace('scoutingattributes_', '').replace('_', ' ').title()
+            chave_traduzida = TRADUCAO_ATRIBUTOS_STAFF.get(chave_original, chave_original)
+            atributos['scouting'][chave_traduzida] = row.get(a)
 
     # ---- Médica ----
     if 'medicalattributes_sportsscience' in row and pd.notna(row.get('medicalattributes_sportsscience')):
-        atributos['medica'] = {'Sports Science': row.get('medicalattributes_sportsscience')}
+        chave_original = 'Sports Science'
+        chave_traduzida = TRADUCAO_ATRIBUTOS_STAFF.get(chave_original, chave_original)
+        atributos['medica'] = {chave_traduzida: row.get('medicalattributes_sportsscience')}
 
     # ---- Personalidade ----
     personalidade = [
@@ -373,8 +472,9 @@ def agrupar_atributos_comissao(row):
     atributos['personalidade'] = {}
     for a in personalidade:
         if a in row and pd.notna(row.get(a)):
-            chave = a.replace('personalityattributes_', '').replace('_', ' ').title()
-            atributos['personalidade'][chave] = row.get(a)
+            chave_original = a.replace('personalityattributes_', '').replace('_', ' ').title()
+            chave_traduzida = TRADUCAO_ATRIBUTOS_STAFF.get(chave_original, chave_original)
+            atributos['personalidade'][chave_traduzida] = row.get(a)
 
     # ---- Funções (roles) ----
     roles = [
@@ -389,8 +489,9 @@ def agrupar_atributos_comissao(row):
     atributos['funcoes'] = {}
     for a in roles:
         if a in row and pd.notna(row.get(a)):
-            chave = a.replace('rolesattributes_', '').replace('_', ' ').title()
-            atributos['funcoes'][chave] = row.get(a)
+            chave_original = a.replace('rolesattributes_', '').replace('_', ' ').title()
+            chave_traduzida = TRADUCAO_ATRIBUTOS_STAFF.get(chave_original, chave_original)
+            atributos['funcoes'][chave_traduzida] = row.get(a)
 
     # Remove categorias vazias
     return {k: v for k, v in atributos.items() if v}
