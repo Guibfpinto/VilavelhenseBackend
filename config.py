@@ -1,4 +1,6 @@
+# config.py
 import os
+
 
 class Config:
     # ============================================================
@@ -28,6 +30,7 @@ class Config:
         'comissao_profissional': os.path.join(DATA_FOLDER, 'perfil_completo_comissao_2027.csv'),
         'comissao_sub20': os.path.join(DATA_FOLDER, 'perfil_completo_comissao_Sub20_2027.csv'),
         'comissao_sub17': os.path.join(DATA_FOLDER, 'perfil_completo_comissao_Sub17_2027.csv'),
+        'diretoria': os.path.join(DATA_FOLDER, 'perfil_completo_diretoria_2027.csv'),
     }
 
     ARQUIVOS_LESOES = {
@@ -49,35 +52,11 @@ class Config:
         'comissao_profissional': os.path.join(DATA_FOLDER, 'cartoes_acumulados_comissao_profissional.json'),
         'comissao_sub20': os.path.join(DATA_FOLDER, 'cartoes_acumulados_comissao_sub20.json'),
         'comissao_sub17': os.path.join(DATA_FOLDER, 'cartoes_acumulados_comissao_sub17.json'),
+        'diretoria': os.path.join(DATA_FOLDER, 'cartoes_acumulados_diretoria.json'),
     }
 
     # ============================================================
-    # PASTAS DE ESTATÍSTICAS (CSVs de partidas) – CADA CATEGORIA PODE TER MÚLTIPLAS PASTAS
-    # ============================================================
-    # Para jogadores
-    PASTA_ESTATISTICAS_PROFISSIONAL = [
-        os.path.join(DATA_FOLDER, 'estatisticas', 'profissional')
-    ]
-    PASTA_ESTATISTICAS_SUB20 = [
-        os.path.join(DATA_FOLDER, 'estatisticas', 'sub20')
-    ]
-    PASTA_ESTATISTICAS_SUB17 = [
-        os.path.join(DATA_FOLDER, 'estatisticas', 'sub17')
-    ]
-
-    # Para comissão técnica
-    PASTA_ESTATISTICAS_COMISSAO_PROFISSIONAL = [
-        os.path.join(DATA_FOLDER, 'estatisticas_comissao', 'profissional')
-    ]
-    PASTA_ESTATISTICAS_COMISSAO_SUB20 = [
-        os.path.join(DATA_FOLDER, 'estatisticas_comissao', 'sub20')
-    ]
-    PASTA_ESTATISTICAS_COMISSAO_SUB17 = [
-        os.path.join(DATA_FOLDER, 'estatisticas_comissao', 'sub17')
-    ]
-
-    # ============================================================
-    # BANCO SQLITE DE FALLBACK (para partidas)
+    # BANCO SQLITE DE FALLBACK
     # ============================================================
     SQLITE_PATH = os.path.join(DATA_FOLDER, 'meu_futebol.db')
 
@@ -85,8 +64,20 @@ class Config:
     # CATEGORIAS VÁLIDAS
     # ============================================================
     CATEGORIAS_JOGADORES = ['profissional', 'sub20', 'sub17']
-    CATEGORIAS_COMISSAO = ['comissao_profissional', 'comissao_sub20', 'comissao_sub17']
-    CATEGORIAS_CARTOES = CATEGORIAS_JOGADORES + CATEGORIAS_COMISSAO
+
+    CATEGORIAS_COMISSAO = [
+        'comissao_profissional',
+        'comissao_sub20',
+        'comissao_sub17',
+    ]
+
+    CATEGORIAS_DIRETORIA = ['diretoria']
+
+    CATEGORIAS_CARTOES = (
+        CATEGORIAS_JOGADORES
+        + CATEGORIAS_COMISSAO
+        + CATEGORIAS_DIRETORIA
+    )
 
     # ============================================================
     # CONFIGURAÇÕES DA API-FOOTBALL
@@ -102,7 +93,7 @@ class Config:
     # ============================================================
     # URL DA FASTAPI (FALLBACK PARA PARTIDAS)
     # ============================================================
-    FASTAPI_URL = "http://localhost:8000"  # Altere se a FastAPI estiver em outro IP/porta
+    FASTAPI_URL = "http://localhost:8000"
 
     # ============================================================
     # ATRIBUTOS FM26 – JOGADORES
@@ -151,37 +142,31 @@ class Config:
     ]
 
     # ============================================================
-    # MAPEAMENTO DE ARQUIVOS POR CATEGORIA (para funções auxiliares)
+    # ATRIBUTOS FM26 – DIRETORIA (colunas do CSV real)
     # ============================================================
-    @classmethod
-    def get_csv_path(cls, categoria):
-        """Retorna o caminho do CSV principal de uma categoria (jogadores ou comissão)."""
-        return cls.ARQUIVOS_CSV.get(categoria)
-
-    @classmethod
-    def get_lesoes_path(cls, categoria):
-        """Retorna o caminho do CSV de lesões de uma categoria."""
-        return cls.ARQUIVOS_LESOES.get(categoria)
-
-    @classmethod
-    def get_bio_path(cls, categoria):
-        """Retorna o caminho do CSV de bioimpedância de uma categoria."""
-        return cls.ARQUIVOS_BIO.get(categoria)
-
-    @classmethod
-    def get_cartoes_path(cls, categoria):
-        """Retorna o caminho do arquivo JSON de cartões de uma categoria."""
-        return cls.ARQUIVOS_CARTOES.get(categoria)
-
-    @classmethod
-    def get_estatisticas_pastas(cls, categoria):
-        """Retorna a lista de pastas de estatísticas (CSVs de partidas) para uma categoria."""
-        mapa = {
-            'profissional': cls.PASTA_ESTATISTICAS_PROFISSIONAL,
-            'sub20': cls.PASTA_ESTATISTICAS_SUB20,
-            'sub17': cls.PASTA_ESTATISTICAS_SUB17,
-            'comissao_profissional': cls.PASTA_ESTATISTICAS_COMISSAO_PROFISSIONAL,
-            'comissao_sub20': cls.PASTA_ESTATISTICAS_COMISSAO_SUB20,
-            'comissao_sub17': cls.PASTA_ESTATISTICAS_COMISSAO_SUB17,
-        }
-        return mapa.get(categoria, [])
+    ATRIBUTOS_FM26_DIRETORIA = [
+        # Gerais / Reputação
+        'ca_diretoria', 'pa_diretoria',
+        'reputacao_mundial', 'reputacao_atual', 'reputacao_local',
+        # Presidência (Chairman)
+        'habilidade_negocios', 'interferencia',
+        'paciencia_diretoria', 'recursos_financeiros',
+        # Não-Táticos
+        'compra_jogadores', 'intensidade_treino',
+        'jogos_mentais', 'rotacao_elenco',
+        # Staff Mental
+        'adaptabilidade', 'determinacao',
+        'julgamento_jogador', 'julgamento_potencial', 'julgamento_staff',
+        'negociacao', 'autoridade', 'motivacao', 'conhecimento_tatico',
+        # Scouting / Análise
+        'analise_dados_jogador', 'analise_dados_time', 'apresentacao_dados',
+        # Treinamento
+        'gestao_pessoas', 'trabalho_jovens', 'bolas_paradas',
+        'tolerancia_sujeira', 'versatilidade',
+        # Personalidade
+        'ambicao', 'lealdade', 'pressao', 'profissionalismo',
+        'esportividade', 'temperamento', 'controversia', 'personalidade',
+        # Informações pessoais / clube
+        'nacionalidade', 'clube', 'divisao', 'no_clube_desde',
+        'fmrte_id', 'historico_profissional',
+    ]
