@@ -1,4 +1,4 @@
-# services/dados.py - Versão final com estatísticas, atributos únicos e tradução para português
+# services/dados.py - Versão final com estatísticas, atributos únicos, tradução e nome completo
 
 import os
 import pandas as pd
@@ -289,6 +289,7 @@ def carregar_dados_elenco(categoria):
 def carregar_dados_comissao(categoria):
     """
     Carrega CSV da comissão técnica, incluindo estatísticas e atributos traduzidos.
+    Garante que 'nome_completo' e 'nome' (apelido) estejam sempre presentes.
     """
     caminho = Config.ARQUIVOS_CSV.get(categoria)
     if not caminho or not os.path.exists(caminho):
@@ -298,13 +299,30 @@ def carregar_dados_comissao(categoria):
         df = pd.read_csv(caminho, sep=';', encoding='utf-8-sig', dtype=str)
         df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_')
 
-        # Padroniza nome
+        # ===== GARANTE NOME COMPLETO =====
+        if 'nome_completo' not in df.columns:
+            df['nome_completo'] = ''
+        df['nome_completo'] = df['nome_completo'].fillna('').astype(str).str.strip()
+
+        # ===== GARANTE APELIDO (nome) =====
         if 'apelido' in df.columns:
-            df['nome'] = df['apelido'].fillna('')
+            df['nome'] = df['apelido'].fillna('').astype(str).str.strip()
         elif 'nome_completo' in df.columns:
-            df['nome'] = df['nome_completo'].fillna('')
+            df['nome'] = df['nome_completo']
         else:
             df['nome'] = ''
+
+        # Fallback: se o nome completo estiver vazio, usa o apelido
+        df['nome_completo'] = df.apply(
+            lambda row: row['nome_completo'] if row['nome_completo'] else row['nome'],
+            axis=1
+        )
+
+        # Fallback: se o apelido estiver vazio, usa o nome completo
+        df['nome'] = df.apply(
+            lambda row: row['nome'] if row['nome'] else row['nome_completo'],
+            axis=1
+        )
 
         if 'cargo' not in df.columns:
             df['cargo'] = 'Técnico'
