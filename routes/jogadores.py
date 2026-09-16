@@ -4,6 +4,8 @@ from services.dados import (
     carregar_lesoes,
     carregar_bioimpedancia,
     agrupar_atributos_jogador,
+    adicionar_lesao,           # 🔥 já existe em dados.py
+    adicionar_lesao_com_data_fim,  # 🔥 já existe em dados.py
 )
 from services.cartoes_service import (
     carregar_cartoes,
@@ -11,9 +13,7 @@ from services.cartoes_service import (
     mapear_nome_para_canonico,
 )
 from services.fotos import encontrar_foto_url
-from services.lesoes_service import adicionar_lesao
 from config import Config
-import numpy as np
 import pandas as pd
 import os
 
@@ -32,7 +32,6 @@ def get_jogadores(categoria):
     if df is None or df.empty:
         return jsonify({'error': 'Dados não encontrados'}), 404
 
-    # Lesões
     lesoes = carregar_lesoes(categoria)
     df['lesionado'] = df.apply(
         lambda row: lesoes.get(row.get('ogol_id'))
@@ -40,7 +39,6 @@ def get_jogadores(categoria):
         axis=1,
     )
 
-    # Bioimpedância
     bio = carregar_bioimpedancia(categoria)
     for idx, row in df.iterrows():
         nome = row.get('nome_completo')
@@ -131,6 +129,7 @@ def get_lesoes_jogador(categoria, nome):
     if categoria not in Config.CATEGORIAS_JOGADORES:
         return jsonify({'error': 'Categoria inválida'}), 400
 
+    # Define o caminho do CSV de lesões
     if categoria == 'profissional':
         csv_path = Config.ARQUIVOS_LESOES.get('profissional')
     elif categoria == 'sub20':
@@ -141,7 +140,7 @@ def get_lesoes_jogador(categoria, nome):
         return jsonify({'error': 'Categoria sem suporte'}), 400
 
     if not csv_path or not os.path.exists(csv_path):
-        return jsonify({'error': 'Arquivo de lesões não encontrado'}), 404
+        return jsonify({'historico': 'Arquivo de lesões não encontrado.'})
 
     try:
         df_lesoes = pd.read_csv(
@@ -160,7 +159,74 @@ def get_lesoes_jogador(categoria, nome):
 
     linhas = []
     tem_lesao = False
+
     for col in colunas_lesoes:
         valor = linha.iloc[0].get(col, '')
         if pd.notna(valor) and str(valor).strip() != '':
-           
+            tem_lesao = True
+            nome_lesao = col.replace('Lesao_', '').replace('_', ' ')
+            ocorrencias = str(valor).split(',')
+            ocorrencias_formatadas = []
+
+            for occ in ocorrencias:
+                occ = occ.strip().rstrip(';').strip()
+                if ' / ' in occ or ' - ' in occ or '–' in occ:
+                    ocorrencias_formatadas.append(occ)
+                else:
+                    ocorrencias_formatadas.append(f"{occ} (atual)")
+
+            linhas.append(
+                f"• {nome_lesao}: {', '.join(ocorrencias_formatadas)}"
+            )
+
+    if not tem_lesao:
+        return jsonify({'historico': 'Nenhuma lesão registrada.'})
+
+    return jsonify({'historico': '\n'.join(linhas)})
+
+
+# ============================================================
+# 🔥 REGISTRAR NOVA LESÃO (NOVO)
+# ============================================================
+@bp.route('/lesoes', methods=['POST'])
+def registrar_lesao():
+    """
+    Registra uma nova lesão para um jogador.
+    Body esperado:
+    {
+        "nome_completo": "Lucas Jorge",
+        "tipo_lesao": "Tornozelo",
+        "data_inicio": "2026-09-15",
+        "data_fim": null  (ou "2026-09-20" se encerrada)
+    }
+    """
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'Dados inválidos'}), 400
+
+    nome = data.get('nome_completo')
+    tipo = data.get('tipo_lesao')
+    data_ini = data.get('data_inicio')
+    data_fim = data.get('data_fim')  # pode ser None
+
+    if not nome or not tipo or not data_ini:
+        return jsonify({
+            'error': 'Campos obrigatórios: nome_completo, tipo_lesao, data_inicio'
+        }), 400
+
+    # Define o CSV de lesões (sempre profissional por enquanto)
+    csv_path = Config.ARQUIVOS_LESOES.get('profissional')
+    if not csv_path:
+        return jsonify({'error': 'CSV de lesões não configurado'}), 500
+
+    try:
+        adicionar_lesao(csv_path, nome, tipo, data_ini, data_fim)
+        return jsonify({
+            'status': 'ok',
+            'mensagem': f'Lesão "{tipo}" registrada para {nome}',
+        })
+    except Exception as e:
+        print(f"❌ Erro ao registrar lesão: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
