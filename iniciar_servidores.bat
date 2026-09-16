@@ -1,6 +1,18 @@
 @echo off
+
+REM 🔥 Se não foi chamado com "minimized", reinicia minimizado
+if not "%1"=="minimized" (
+    start /min cmd /c "%~f0" minimized
+    exit /b
+)
+
 title Vilavelhense FC - Servidores (Funnel + Backend)
 setlocal enabledelayedexpansion
+
+REM 🔥 Aguarda 30s para o Windows/Tailscale/rede iniciarem
+echo Aguardando inicializacao do Windows (30s)...
+timeout /t 30 /nobreak >nul
+echo [OK] Iniciando servidores...
 
 REM ============================================================
 REM CONFIGURACOES
@@ -22,8 +34,7 @@ REM 1. VERIFICA O VENV
 REM ============================================================
 echo [1/5] Verificando ambiente virtual...
 if not exist "%PYTHON_EXE%" (
-    echo ❌ ERRO: venv nao encontrado!
-    echo    Execute primeiro "instalar_backend.bat"
+    echo ERRO: venv nao encontrado!
     pause
     exit /b 1
 )
@@ -36,7 +47,7 @@ echo.
 echo [2/5] Verificando Tailscale...
 tailscale status >nul 2>&1
 if errorlevel 1 (
-    echo ❌ ERRO: Tailscale nao encontrado ou nao logado!
+    echo ERRO: Tailscale nao encontrado ou nao logado!
     pause
     exit /b 1
 )
@@ -47,10 +58,7 @@ REM 3. RESETA O FUNNEL ANTERIOR
 REM ============================================================
 echo.
 echo [3/5] Resetando Funnel anterior...
-
-REM Reseta em background (nao trava)
 start /B /WAIT cmd /c "tailscale serve reset >nul 2>&1"
-
 echo     [OK] Reset concluido
 
 REM ============================================================
@@ -58,35 +66,46 @@ REM 4. ATIVA O FUNNEL EM BACKGROUND
 REM ============================================================
 echo.
 echo [4/5] Ativando Funnel na porta %FLASK_PORT%...
-
-REM --bg roda em background (nao trava o terminal)
-REM --yes aceita qualquer confirmacao automaticamente
 start /B /WAIT cmd /c "tailscale funnel --bg --yes %FLASK_PORT% >nul 2>&1"
-
 echo     [OK] Funnel configurado
 echo     URL: %FUNNEL_URL%
-
-REM Aguarda o Funnel ficar pronto
 timeout /t 3 /nobreak >nul
 
 REM ============================================================
-REM 5. INICIA O FLASK
+REM 5. INICIA O FLASK (MINIMIZADO)
 REM ============================================================
 echo.
 echo [5/5] Iniciando Flask (app.py - porta %FLASK_PORT%)...
 
 if not exist "%BACKEND_DIR%\app.py" (
-    echo ❌ ERRO: app.py nao encontrado!
+    echo ERRO: app.py nao encontrado!
     pause
     exit /b 1
 )
 
 cd /d "%BACKEND_DIR%"
-start "Flask - Vilavelhense" cmd /k ""%PYTHON_EXE%" app.py"
-echo     [OK] Flask iniciado
+
+REM 🔥 Flask minimizado
+start /min "Flask - Vilavelhense" cmd /k ""%PYTHON_EXE%" app.py"
+echo     [OK] Flask iniciado (minimizado)
 
 REM Aguarda o Flask subir
 timeout /t 5 /nobreak >nul
+
+REM ============================================================
+REM 5.1. INICIA A FASTAPI (MINIMIZADO) - SE EXISTIR
+REM ============================================================
+if exist "%BACKEND_DIR%\api.py" (
+    echo.
+    echo [5.1] Iniciando FastAPI (porta %FASTAPI_PORT%)...
+    REM 🔥 FastAPI minimizada
+    start /min "FastAPI - Vilavelhense" cmd /k ""%PYTHON_EXE%" -m uvicorn api:app --host 127.0.0.1 --port %FASTAPI_PORT%"
+    echo     [OK] FastAPI iniciado (minimizado)
+    timeout /t 3 /nobreak >nul
+) else (
+    echo.
+    echo [!] api.py nao encontrado. FastAPI nao iniciada.
+)
 
 REM ============================================================
 REM TESTE AUTOMATICO
@@ -94,7 +113,6 @@ REM ============================================================
 echo.
 echo [BONUS] Testando conexoes...
 
-REM Testa Flask local
 curl.exe -s --max-time 5 http://localhost:%FLASK_PORT%/api/health | findstr "ok" >nul 2>&1
 if errorlevel 1 (
     echo     [!] Flask ainda nao respondeu
@@ -102,10 +120,9 @@ if errorlevel 1 (
     echo     [OK] Flask respondendo em http://localhost:%FLASK_PORT%
 )
 
-REM Testa Funnel externo
 curl.exe -s --max-time 10 %FUNNEL_URL%/api/health | findstr "ok" >nul 2>&1
 if errorlevel 1 (
-    echo     [!] Funnel ainda nao respondeu (aguarde alguns segundos)
+    echo     [!] Funnel ainda nao respondeu
 ) else (
     echo     [OK] Funnel respondendo em %FUNNEL_URL%
 )
@@ -120,10 +137,14 @@ echo ============================================================
 echo.
 echo   Funnel:    %FUNNEL_URL%
 echo   Flask:     http://localhost:%FLASK_PORT%
+echo   FastAPI:   http://localhost:%FASTAPI_PORT%
 echo.
 echo   Health:    %FUNNEL_URL%/api/health
 echo.
-echo   NAO FECHE AS JANELAS DO FLASK
-echo   Mantenha o Tailscale ativo
+echo   Todas as janelas estao MINIMIZADAS
+echo   Verifique a barra de tarefas para acessa-las
 echo.
-pause >nul
+echo   Esta janela fecha em 15 segundos...
+
+timeout /t 15 /nobreak >nul
+exit /b 0
