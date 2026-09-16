@@ -1,72 +1,132 @@
 @echo off
-title Vilavelhense FC - Servidores com Fallback e ngrok
+title Vilavelhense FC - Servidores (IP Automatico)
+setlocal enabledelayedexpansion
 
 REM ============================================================
-REM CONFIGURE AQUI OS IPs (casa e faculdade)
+REM CONFIGURACOES
 REM ============================================================
-set "IP_CASA=192.168.1.107"
-set "IP_FACULDADE=172.27.60.223"
+set "BACKEND_DIR=%~dp0"
+set "BACKEND_DIR=%BACKEND_DIR:~0,-1%"
+set "PYTHON_EXE=%BACKEND_DIR%\venv\Scripts\python.exe"
+set "PORT=5000"
+
+echo ============================================================
+echo   VILAVELHENSE FC - INICIANDO SERVIDORES
+echo ============================================================
+echo.
 
 REM ============================================================
-REM TESTA CONECTIVIDADE COM O IP DE CASA
+REM 1. DETECTA O IP DO PC AUTOMATICAMENTE
 REM ============================================================
-ping -n 1 %IP_CASA% > nul
-if %errorlevel% equ 0 (
-    set "HOST=%IP_CASA%"
-    echo ✅ Conectado em casa - usando IP: %HOST%
-) else (
-    set "HOST=%IP_FACULDADE%"
-    echo 🌐 Conectado na faculdade - usando IP: %HOST%
+echo [1/4] Detectando IP do computador...
+set "HOST="
+
+REM --- Tentativa 1: PowerShell (mais confiavel) ---
+for /f "usebackq tokens=*" %%a in (`powershell -NoProfile -Command "(Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue | Where-Object { $_.IPAddress -notlike '169.*' -and $_.IPAddress -notlike '127.*' -and $_.InterfaceAlias -notlike '*Loopback*' -and $_.InterfaceAlias -notlike '*Virtual*' -and $_.InterfaceAlias -notlike '*VMware*' -and $_.InterfaceAlias -notlike '*Hyper-V*' } | Sort-Object InterfaceMetric | Select-Object -First 1 -ExpandProperty IPAddress"`) do (
+    set "HOST=%%a"
 )
 
-REM ============================================================
-REM DIRETÓRIO DO BACKEND
-REM ============================================================
-set "BACKEND_DIR=D:\VilavelhenseBackend"
-cd /d "%BACKEND_DIR%" || (
-    echo ❌ Diretório não encontrado!
+REM --- Tentativa 2: ipconfig (fallback) ---
+if "!HOST!"=="" (
+    for /f "tokens=2 delims=:" %%a in ('ipconfig ^| findstr /c:"IPv4"') do (
+        if "!HOST!"=="" (
+            set "IP_TEMP=%%a"
+            set "IP_TEMP=!IP_TEMP: =!"
+            set "HOST=!IP_TEMP!"
+        )
+    )
+)
+
+if "!HOST!"=="" (
+    echo.
+    echo ❌ ERRO: Nao foi possivel detectar o IP automaticamente.
+    echo    Verifique se voce esta conectado a uma rede.
+    echo.
     pause
-    exit /b
+    exit /b 1
 )
 
-echo ========================================
-echo  🚀 Iniciando Servidores em %HOST%
-echo ========================================
+echo     ✅ IP detectado: !HOST!
 echo.
 
 REM ============================================================
-REM 1. FASTAPI (porta 8000)
+REM 2. VERIFICA O VENV
 REM ============================================================
-echo 📡 Iniciando FastAPI...
-start "FastAPI" .\venv\Scripts\python.exe -m uvicorn api:app --host %HOST% --port 8000 --reload
-timeout /t 3 /nobreak > nul
+echo [2/4] Verificando ambiente virtual...
+if not exist "%PYTHON_EXE%" (
+    echo.
+    echo ❌ ERRO: Ambiente virtual nao encontrado!
+    echo    Execute primeiro "instalar_backend.bat"
+    echo.
+    pause
+    exit /b 1
+)
+echo     ✅ Ambiente virtual OK.
 
 REM ============================================================
-REM 2. FLASK (porta 5000)
+REM 3. VERIFICA O NGROK
 REM ============================================================
-echo 🐍 Iniciando Flask...
-start "Flask" .\venv\Scripts\python.exe app.py
-timeout /t 3 /nobreak > nul
+echo.
+echo [3/4] Verificando ngrok...
+ngrok --version >nul 2>&1
+if errorlevel 1 (
+    echo     ⚠️  ngrok nao encontrado. O app so funcionara na rede local.
+    set "HAS_NGROK=0"
+) else (
+    echo     ✅ ngrok encontrado.
+    set "HAS_NGROK=1"
+)
 
 REM ============================================================
-REM 3. NGROK (túnel público para 4G)
+REM 4. INICIA OS SERVIDORES
 REM ============================================================
-echo 🌐 Iniciando ngrok (túnel público para 4G)...
-start "ngrok" ngrok http 5000
+echo.
+echo [4/4] Iniciando servidores...
+echo.
 
+cd /d "%BACKEND_DIR%"
+
+REM Inicia o Flask
+start "Flask - Vilavelhense" "%PYTHON_EXE%" app.py
+echo     ✅ Flask iniciado
+echo        📡 http://!HOST!:%PORT%
+
+timeout /t 3 /nobreak >nul
+
+REM Inicia o ngrok (se existir)
+if "!HAS_NGROK!"=="1" (
+    start "ngrok - Vilavelhense" ngrok http %PORT%
+    echo     ✅ ngrok iniciado (veja a URL na janela do ngrok)
+    echo.
+    echo     ⚠️  IMPORTANTE: copie a URL do ngrok e envie para o testador
+    echo        Exemplo: https://abc123.ngrok-free.dev
+) else (
+    echo     ⚠️  ngrok nao iniciado
+)
+
+REM ============================================================
+REM 5. EXIBE UM ARQUIVO TXT COM O IP (para o app)
+REM ============================================================
+echo !HOST! > "%BACKEND_DIR%\ip_atual.txt"
 echo.
-echo ========================================
-echo  ✅ TODOS OS SERVIÇOS INICIADOS!
-echo ========================================
+echo     📝 IP salvo em: ip_atual.txt
+
+REM ============================================================
+REM RESUMO FINAL
+REM ============================================================
 echo.
-echo    📡 FastAPI: http://%HOST%:8000
-echo    🐍 Flask:   http://%HOST%:5000
-echo    🌐 ngrok:   https://spew-custodian-serve.ngrok-free.dev
+echo ============================================================
+echo   ✅ SERVIDORES RODANDO
+echo ============================================================
 echo.
-echo    📌 Para usar no 4G, atualize o URL no arquivo:
-echo       src/api/index.js
-echo       com a URL do ngrok (que pode mudar a cada sessão)
+echo   📡 IP do PC:  !HOST!
+echo   🔌 Flask:     http://!HOST!:%PORT%
+echo   🩺 Health:    http://!HOST!:%PORT%/api/health
+if "!HAS_NGROK!"=="1" (
+    echo   🌐 ngrok:     veja a URL na janela do ngrok
+)
 echo.
-echo    🔗 Interface do ngrok: http://127.0.0.1:4040
+echo   ⚠️  NAO FECHE ESTA JANELA NEM A DO FLASK/NGROK
+echo   ⚠️  O celular deve estar na MESMA rede Wi-Fi
 echo.
-pause
+pause >nul
