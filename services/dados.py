@@ -1,4 +1,4 @@
-# services/dados.py - Versão final: CA/PA/Reputação mantidos originais
+# services/dados.py - Versão final: valores do CSV mantidos como estão
 
 import os
 import pandas as pd
@@ -106,20 +106,6 @@ TRADUCAO_ATRIBUTOS_DIRETORIA = {
 
 
 # ============================================================================
-# CAMPOS QUE NÃO SÃO NORMALIZADOS (mantêm o valor original)
-# ============================================================================
-
-CAMPOS_ORIGINAIS_COMISSAO = {
-    'ca', 'pa', 'reputacao_mundial', 'reputacao_atual', 'reputacao_local',
-}
-
-CAMPOS_ORIGINAIS_DIRETORIA = {
-    'ca_diretoria', 'pa_diretoria',
-    'reputacao_mundial', 'reputacao_atual', 'reputacao_local',
-}
-
-
-# ============================================================================
 # FUNÇÕES AUXILIARES
 # ============================================================================
 
@@ -152,43 +138,30 @@ def safe_divide(numerador, denominador):
 
 def normalizar_valor_atributo(valor):
     """
-    🔥 Normaliza UM valor individual de atributo e retorna INTEIRO.
-    - Se for > 100, divide por 100 (ex: 1030 → 10)
-    - Se for > 20 mas <= 100, divide por 5 (ex: 85 → 17)
-    - Se for <= 20, mantém (ex: 10 → 10)
-    - Arredonda para INTEIRO
+    🔥 Apenas converte para número INTEIRO.
+    NÃO divide, NÃO corta. O CSV já tem valores na escala correta.
     """
     if pd.isna(valor) or valor is None:
         return valor
-
     try:
-        v = float(str(valor).replace(',', '.'))
+        return int(float(str(valor).replace(',', '.')))
     except (ValueError, TypeError):
         return valor
 
-    if v > 100:
-        return int(round(v / 100.0))
-    elif v > 20:
-        return int(round(v / 5.0))
-    return int(round(v))
-
 
 def normalizar_atributo(valor):
-    """Alias para normalizar_valor_atributo (compatibilidade)."""
+    """Alias para normalizar_valor_atributo."""
     return normalizar_valor_atributo(valor)
 
 
 def manter_valor_original(valor):
     """
-    🔥 Mantém o valor original (para CA, PA e Reputação).
-    Só converte para número, sem dividir nem arredondar para inteiro.
+    Mantém o valor original (para CA, PA e Reputação).
     """
     if valor is None or pd.isna(valor):
         return valor
-
     try:
         v = float(str(valor).replace(',', '.'))
-        # Se for inteiro, retorna como inteiro; senão, como float
         if v.is_integer():
             return int(v)
         return v
@@ -241,10 +214,9 @@ def carregar_dados_elenco(categoria):
             if col in df.columns:
                 df[col] = parse_numero_coluna(df[col])
 
-        # 🔥 NORMALIZA OS ATRIBUTOS DOS JOGADORES (por valor, não por coluna)
+        # 🔥 ATRIBUTOS DOS JOGADORES: apenas converte para int
         for attr in Config.ATRIBUTOS_FM26_JOGADORES:
             if attr in df.columns:
-                df[attr] = parse_numero_coluna(df[attr])
                 df[attr] = df[attr].apply(normalizar_valor_atributo)
 
         estatisticas_jogador = [
@@ -543,7 +515,7 @@ def carregar_dados_diretoria(categoria='diretoria'):
 # ============================================================================
 
 def agrupar_atributos_jogador(row):
-    """Agrupa atributos do jogador."""
+    """Agrupa atributos do jogador (valores como estão no CSV)."""
     atributos = {}
     tecnicos = [
         'escanteios', 'cruzamentos', 'drible', 'finalizacao', 'primeiro_controle',
@@ -601,12 +573,12 @@ def agrupar_atributos_jogador(row):
 
 def agrupar_atributos_comissao(row):
     """Agrupa atributos da comissão.
-    CA, PA e Reputação mantêm o valor original (sem normalização).
-    Os outros atributos passam por normalização (>100÷100, >20÷5, int).
+    CA, PA e Reputação mantêm o valor original.
+    Outros são apenas convertidos para int (sem divisão).
     """
     atributos = {}
 
-    # ---- CA, PA e Reputação (mantêm valor original) ----
+    # CA, PA e Reputação (valor original)
     campos_originais = {
         'ca': 'CA',
         'pa': 'PA',
@@ -619,10 +591,8 @@ def agrupar_atributos_comissao(row):
         if campo in row and pd.notna(row.get(campo)):
             atributos['gerais'][label] = manter_valor_original(row.get(campo))
 
-    # ---- Outros campos gerais (normalizados) ----
-    outros_gerais = [
-        'qualificacoes_treinador', 'jogos_selecao', 'gols_selecao',
-    ]
+    # Outros gerais
+    outros_gerais = ['qualificacoes_treinador', 'jogos_selecao', 'gols_selecao']
     for a in outros_gerais:
         if a in row and pd.notna(row.get(a)):
             chave_original = a.replace('_', ' ').title()
@@ -633,7 +603,7 @@ def agrupar_atributos_comissao(row):
                 row.get(a)
             )
 
-    # ---- Treinamento ----
+    # Treinamento
     coaching = [
         'coachingattributes_attacking', 'coachingattributes_defending',
         'coachingattributes_fitness', 'coachingattributes_goalkeeping',
@@ -657,7 +627,7 @@ def agrupar_atributos_comissao(row):
                 row.get(a)
             )
 
-    # ---- Staff Mental ----
+    # Staff Mental
     staff_mental = [
         'staffmentalattributes_adaptability',
         'staffmentalattributes_determination',
@@ -683,7 +653,7 @@ def agrupar_atributos_comissao(row):
                 row.get(a)
             )
 
-    # ---- Táticas ----
+    # Táticas
     taticas = [
         'tacticalattributes_attacking', 'tacticalattributes_depth',
         'tacticalattributes_directness', 'tacticalattributes_flamboyancy',
@@ -706,7 +676,7 @@ def agrupar_atributos_comissao(row):
                 row.get(a)
             )
 
-    # ---- Scouting ----
+    # Scouting
     scouting = [
         'scoutingattributes_judgingplayerdata',
         'scoutingattributes_judgingteamdata',
@@ -725,7 +695,7 @@ def agrupar_atributos_comissao(row):
                 row.get(a)
             )
 
-    # ---- Médica ----
+    # Médica
     if 'medicalattributes_sportsscience' in row and pd.notna(
         row.get('medicalattributes_sportsscience')
     ):
@@ -738,7 +708,7 @@ def agrupar_atributos_comissao(row):
             )
         }
 
-    # ---- Personalidade ----
+    # Personalidade
     personalidade = [
         'personalityattributes_adaptability', 'personalityattributes_ambition',
         'personalityattributes_loyalty', 'personalityattributes_pressure',
@@ -758,7 +728,7 @@ def agrupar_atributos_comissao(row):
                 row.get(a)
             )
 
-    # ---- Funções ----
+    # Funções
     roles = [
         'rolesattributes_assistantmanager', 'rolesattributes_coach',
         'rolesattributes_fitnesscoach', 'rolesattributes_goalkeepingcoach',
@@ -792,11 +762,11 @@ def agrupar_atributos_comissao(row):
 
 def agrupar_atributos_diretoria(row):
     """Agrupa atributos da Diretoria.
-    CA, PA e Reputação mantêm o valor original (sem normalização).
+    CA, PA e Reputação mantêm o valor original.
     """
     atributos = {}
 
-    # ---- CA, PA e Reputação (mantêm valor original) ----
+    # CA, PA e Reputação (valor original)
     campos_originais = {
         'ca_diretoria': 'CA',
         'pa_diretoria': 'PA',
@@ -809,7 +779,7 @@ def agrupar_atributos_diretoria(row):
         if campo in row and pd.notna(row.get(campo)):
             atributos['gerais'][label] = manter_valor_original(row.get(campo))
 
-    # ---- Presidência ----
+    # Presidência
     presidencia = {
         'habilidade_negocios': 'Habilidade de Negócios',
         'interferencia': 'Interferência',
@@ -823,7 +793,7 @@ def agrupar_atributos_diretoria(row):
                 row.get(col)
             )
 
-    # ---- Não-Táticos ----
+    # Não-Táticos
     nao_taticos = {
         'compra_jogadores': 'Compra de Jogadores',
         'intensidade_treino': 'Intensidade do Treino',
@@ -837,7 +807,7 @@ def agrupar_atributos_diretoria(row):
                 row.get(col)
             )
 
-    # ---- Staff Mental ----
+    # Staff Mental
     staff_mental = {
         'adaptabilidade': 'Adaptabilidade',
         'determinacao': 'Determinação',
@@ -856,7 +826,7 @@ def agrupar_atributos_diretoria(row):
                 row.get(col)
             )
 
-    # ---- Scouting / Análise ----
+    # Scouting
     scouting = {
         'analise_dados_jogador': 'Análise de Dados de Jogador',
         'analise_dados_time': 'Análise de Dados de Time',
@@ -867,7 +837,7 @@ def agrupar_atributos_diretoria(row):
         if col in row and pd.notna(row.get(col)):
             atributos['scouting'][label] = normalizar_valor_atributo(row.get(col))
 
-    # ---- Treinamento ----
+    # Treinamento
     treinamento = {
         'gestao_pessoas': 'Gestão de Pessoas',
         'trabalho_jovens': 'Trabalho com Jovens',
@@ -882,7 +852,7 @@ def agrupar_atributos_diretoria(row):
                 row.get(col)
             )
 
-    # ---- Personalidade ----
+    # Personalidade
     personalidade = {
         'ambicao': 'Ambição',
         'lealdade': 'Lealdade',
@@ -900,7 +870,7 @@ def agrupar_atributos_diretoria(row):
                 row.get(col)
             )
 
-    # ---- Informações ----
+    # Informações
     info = {
         'nacionalidade': 'Nacionalidade',
         'clube': 'Clube',
@@ -919,7 +889,7 @@ def agrupar_atributos_diretoria(row):
 
 
 # ============================================================================
-# LESÕES - CARREGAMENTO
+# LESÕES
 # ============================================================================
 
 def carregar_lesoes(categoria):
@@ -966,10 +936,6 @@ def carregar_lesoes(categoria):
         print(f"❌ Erro ao carregar lesões {categoria}: {e}")
         return {}
 
-
-# ============================================================================
-# LESÕES - ADICIONAR
-# ============================================================================
 
 def adicionar_lesao(csv_path, nome_jogador, tipo_lesao, data_inicio, data_fim=None):
     """Adiciona uma ocorrência de lesão para um jogador no CSV."""
