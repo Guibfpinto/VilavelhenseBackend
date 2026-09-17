@@ -55,12 +55,13 @@ app.register_blueprint(relatorios.bp)
 def home():
     return jsonify({
         'nome': 'Vilavelhense FC API',
-        'versao': '2.2',
+        'versao': '2.3',  # ← subi a versão (nova composição corporal)
         'status': 'online',
         'endpoints': {
             'auth': '/api/auth/login',
             'jogadores': '/api/jogadores/<categoria>',
             'jogadores_buscar': '/api/jogadores/<categoria>/buscar?q=...',
+            'jogadores_detalhe': '/api/jogadores/<categoria>/detalhe/<nome>',
             'comissao': '/api/comissao/<categoria>',
             'diretoria': '/api/diretoria/',
             'cartoes': '/api/cartoes/<categoria>',
@@ -105,13 +106,11 @@ def proxy_fastapi(caminho):
     try:
         url = f"http://localhost:8000/{caminho}"
 
-        # Repassa headers (exceto Host e Content-Length, que são recalculados)
         headers = {
             k: v for k, v in request.headers
             if k.lower() not in ['host', 'content-length']
         }
 
-        # Faz a requisição para a FastAPI
         resp = http_requests.request(
             method=request.method,
             url=url,
@@ -122,7 +121,6 @@ def proxy_fastapi(caminho):
             allow_redirects=False,
         )
 
-        # Remove headers problemáticos da resposta
         headers_resp = {
             k: v for k, v in resp.headers.items()
             if k.lower() not in [
@@ -133,11 +131,7 @@ def proxy_fastapi(caminho):
             ]
         }
 
-        return Response(
-            resp.content,
-            status=resp.status_code,
-            headers=headers_resp
-        )
+        return Response(resp.content, status=resp.status_code, headers=headers_resp)
 
     except http_requests.exceptions.ConnectionError:
         return jsonify({
@@ -147,14 +141,10 @@ def proxy_fastapi(caminho):
         }), 503
 
     except http_requests.exceptions.Timeout:
-        return jsonify({
-            'error': 'Timeout ao conectar na FastAPI',
-        }), 504
+        return jsonify({'error': 'Timeout ao conectar na FastAPI'}), 504
 
     except Exception as e:
-        return jsonify({
-            'error': f'Erro no proxy FastAPI: {str(e)}',
-        }), 500
+        return jsonify({'error': f'Erro no proxy FastAPI: {str(e)}'}), 500
 
 
 # ============================================================
@@ -181,14 +171,12 @@ def serve_foto(categoria, filename):
     if not os.path.exists(pasta):
         abort(404)
 
-    # Segurança: impede path traversal
     filename = os.path.basename(filename)
-
     return send_from_directory(pasta, filename)
 
 
 # ============================================================
-# HANDLER 404 CUSTOMIZADO
+# HANDLERS
 # ============================================================
 @app.errorhandler(404)
 def not_found(error):
@@ -199,9 +187,6 @@ def not_found(error):
     }), 404
 
 
-# ============================================================
-# HANDLER 500 CUSTOMIZADO
-# ============================================================
 @app.errorhandler(500)
 def internal_error(error):
     return jsonify({
@@ -215,7 +200,6 @@ def internal_error(error):
 # ============================================================
 if __name__ == '__main__':
     from services.auth_service import carregar_usuarios
-
     carregar_usuarios()
 
     print("=" * 60)

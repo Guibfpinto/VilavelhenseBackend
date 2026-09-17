@@ -1,4 +1,5 @@
 # services/dados.py - Classificação via atributos_mapper
+# IMC numérico + bioimpedância (CSV) + Faulkner / Pollock / Lee (fallback)
 
 import os
 import pandas as pd
@@ -77,13 +78,18 @@ def safe_float(valor):
 
 
 def parse_numero_coluna(serie):
+    """
+    Converte uma coluna string para numérico.
+    Substitui SOMENTE valores vazios/nulos por '0' (não insere '0' em
+    cada caractere, o que transformava '19' em '1090').
+    """
     if serie is None:
         return serie
-    # Converte para string e troca vírgula decimal por ponto
+
     s = serie.astype(str).str.replace(',', '.', regex=False)
-    # Substitui SOMENTE valores vazios/nulos por '0' (sem mexer nos reais)
     s = s.where(~s.str.strip().isin(['', 'nan', 'None', 'NaN', '<NA>']), '0')
     return pd.to_numeric(s, errors='coerce')
+
 
 def safe_divide(numerador, denominador):
     if denominador is None or pd.isna(denominador) or denominador == 0:
@@ -103,11 +109,68 @@ def classificar(valor, tipo):
 
     valor_norm = normalizar_valor_atributo(valor)
 
-    # Se a normalização falhou (ex.: string não numérica), não classifica
     if valor_norm is None or (isinstance(valor_norm, float) and pd.isna(valor_norm)):
         return None
 
     return classificar_por_tipo(valor_norm, tipo)
+
+
+# ============================================================================
+# ANTROPOMETRIA / ESTIMATIVA DE GORDURA CORPORAL
+# ============================================================================
+
+def imc_numerico(peso_kg, altura_cm):
+    """IMC = peso / (altura_m)². Retorna float arredondado ou None."""
+    try:
+        p = float(str(peso_kg).replace(',', '.'))
+        a = float(str(altura_cm).replace(',', '.'))
+    except (TypeError, ValueError):
+        return None
+    if a <= 0 or p <= 0:
+        return None
+    return round(p / ((a / 100.0) ** 2), 1)
+
+
+def gordura_faulkner(imc, idade):
+    """Faulkner (adaptação IMC, homens): %G = 1.20×IMC + 0.23×idade − 16.2"""
+    try:
+        imc = float(imc); idade = int(float(idade))
+    except (TypeError, ValueError):
+        return None
+    return round((1.20 * imc) + (0.23 * idade) - 16.2, 1)
+
+
+def gordura_pollock(imc, idade):
+    """Pollock (adaptação IMC, homens): %G = 1.29×IMC + 0.20×idade − 18.0"""
+    try:
+        imc = float(imc); idade = int(float(idade))
+    except (TypeError, ValueError):
+        return None
+    return round((1.29 * imc) + (0.20 * idade) - 18.0, 1)
+
+
+def gordura_lee(imc, idade):
+    """Lee (adaptação IMC, homens): %G = 1.10×IMC + 0.25×idade − 14.0"""
+    try:
+        imc = float(imc); idade = int(float(idade))
+    except (TypeError, ValueError):
+        return None
+    return round((1.10 * imc) + (0.25 * idade) - 14.0, 1)
+
+
+def estimar_gordura_por_equacoes(imc, idade):
+    """Aplica as 3 equações e devolve dict com cada valor + a média."""
+    if imc is None or idade is None:
+        return None
+
+    f = gordura_faulkner(imc, idade)
+    p = gordura_pollock(imc, idade)
+    l = gordura_lee(imc, idade)
+
+    valores = [v for v in (f, p, l) if v is not None]
+    media = round(sum(valores) / len(valores), 1) if valores else None
+
+    return {'faulkner': f, 'pollock': p, 'lee': l, 'media': media}
 
 
 # ============================================================================
@@ -173,69 +236,166 @@ def carregar_dados_elenco(categoria):
             else:
                 df[col] = 0
 
-        def calc_imc(row):
-            altura = row.get('altura_cm')
-            peso = row.get('peso_kg')
-            if (altura is None or peso is None
-                    or pd.isna(altura) or pd.isna(peso)):
-                return np.nan
-            try:
-                altura_f = float(altura)
-                peso_f = float(peso)
-            except (TypeError, ValueError):
-                return np.nan
-            if altura_f <= 0:
-                return np.nan
-            return round(peso_f / ((altura_f / 100) ** 2), 1)
+        # ====================================================================
+        # IMC NUMÉRICO
+        # ====================================================================
+        def calc_imc_num(row):
+            return imc_numerico(row.get('peso_kg'), row.get('altura_cm'))
 
-        df['IMC'] = df.apply(calc_imc, axis=1)
+        df['IMC'] = df.apply(calc_imc_num, axis=1)
         df['Classificacao_IMC'] = df['IMC'].apply(classif_imc)
 
+        # ====================================================================
+        # IDADE
+        # ====================================================================
         df['Idade'] = df['data_nascimento'].apply(
             lambda x: calcular_idade(x) if pd.notna(x) else None
         )
 
-        def calc_gordura(row):
-            imc = row.get('IMC')
-            idade = row.get('Idade')
-            if (imc is None or idade is None
-                    or pd.isna(imc) or pd.isna(idade)):
-                return np.nan
+        # ====================================================================
+        # BIOIMPEDÂNCIA (CSV) — indexada por ogol_id e por nome
+        # ====================================================================
+        bio_por_id, bio_por_nome = carregar_bioimpedancia_por_jogador(categoria)
+
+        def buscar_bio(row):
+            oid = row.get('ogol_id')
+            if oid and pd.notna(oid):
+                try:
+                    chave = int(float(oid))
+                    if chave in bio_por_id:
+                        return bio_por_id[chave]
+                except (ValueError, TypeError):
+                    pass
+
+            nome = row.get('nome_completo') or row.get('apelido') or row.get('nome')
+            if nome and str(nome).strip() in bio_por_nome:
+                return bio_por_nome[str(nome).strip()]
+            return None
+
+        df['_bio'] = df.apply(buscar_bio, axis=1)
+
+        # Peso de referência (prioriza bioimpedância)
+        def _peso_kg(row):
+            bio = row.get('_bio')
+            if bio and bio.get('peso') is not None:
+                return bio['peso']
             try:
-                return round((1.20 * float(imc)) + (0.23 * float(idade)) - 16.2, 1)
+                return float(str(row.get('peso_kg')).replace(',', '.'))
             except (TypeError, ValueError):
-                return np.nan
+                return None
 
-        df['Gordura_Corporal_%'] = df.apply(calc_gordura, axis=1)
+        # ====================================================================
+        # %G POR MÉTODO (Faulkner / Pollock / Lee)
+        # + massa magra e massa muscular estimadas de cada método
+        # ====================================================================
+        def _calc_metodo(row, func_gordura):
+            imc, idade = row.get('IMC'), row.get('Idade')
+            g = func_gordura(imc, idade)
+            if g is None:
+                return np.nan, np.nan, np.nan
+            peso = _peso_kg(row)
+            if peso is None:
+                return g, np.nan, np.nan
+            mm = round(peso * (1 - g / 100), 1)
+            mu = round(mm * 0.55, 1)
+            return g, mm, mu
 
-        def calc_massa_magra(row):
-            peso = row.get('peso_kg')
-            gordura = row.get('Gordura_Corporal_%')
-            if (peso is None or gordura is None
-                    or pd.isna(peso) or pd.isna(gordura)):
-                return np.nan
-            try:
-                return round(float(peso) * (1 - float(gordura) / 100), 1)
-            except (TypeError, ValueError):
-                return np.nan
+        # -- Faulkner --
+        faulk = df.apply(lambda r: _calc_metodo(r, gordura_faulkner),
+                         axis=1, result_type='expand')
+        df['Gordura_Faulkner_%']         = faulk[0]
+        df['Massa_Magra_Faulkner_kg']    = faulk[1]
+        df['Massa_Muscular_Faulkner_kg'] = faulk[2]
 
-        df['Massa_Magra_kg'] = df.apply(calc_massa_magra, axis=1)
+        # -- Pollock --
+        poll = df.apply(lambda r: _calc_metodo(r, gordura_pollock),
+                        axis=1, result_type='expand')
+        df['Gordura_Pollock_%']         = poll[0]
+        df['Massa_Magra_Pollock_kg']    = poll[1]
+        df['Massa_Muscular_Pollock_kg'] = poll[2]
 
-        def calc_massa_muscular(row):
+        # -- Lee --
+        lee = df.apply(lambda r: _calc_metodo(r, gordura_lee),
+                       axis=1, result_type='expand')
+        df['Gordura_Lee_%']         = lee[0]
+        df['Massa_Magra_Lee_kg']    = lee[1]
+        df['Massa_Muscular_Lee_kg'] = lee[2]
+
+        # ====================================================================
+        # COLUNAS FINAIS — bioimpedância tem prioridade; senão média das 3
+        # ====================================================================
+        def gordura_final(row):
+            bio = row.get('_bio')
+            if bio and bio.get('gordura') is not None:
+                return bio['gordura'], 'bioimpedancia'
+
+            f = row.get('Gordura_Faulkner_%')
+            p = row.get('Gordura_Pollock_%')
+            l = row.get('Gordura_Lee_%')
+            vals = [v for v in (f, p, l) if pd.notna(v)]
+            if vals:
+                return round(sum(vals) / len(vals), 1), 'estimada'
+            return np.nan, 'sem_dados'
+
+        g_final = df.apply(gordura_final, axis=1, result_type='expand')
+        df['Gordura_Corporal_%'] = g_final[0]
+        df['Origem_Gordura']     = g_final[1]
+
+        # Massa magra final
+        def massa_magra_final(row):
+            bio = row.get('_bio')
+            if bio and bio.get('massa_magra') is not None:
+                return bio['massa_magra'], 'bioimpedancia'
+
+            peso = _peso_kg(row)
+            g = row.get('Gordura_Corporal_%')
+            if peso is None or g is None or pd.isna(g):
+                return np.nan, 'sem_dados'
+            return round(peso * (1 - g / 100), 1), 'estimada'
+
+        mm_final = df.apply(massa_magra_final, axis=1, result_type='expand')
+        df['Massa_Magra_kg']     = mm_final[0]
+        df['Origem_Massa_Magra'] = mm_final[1]
+
+        # Massa muscular final
+        def massa_muscular_final(row):
+            bio = row.get('_bio')
+            if bio and bio.get('massa_muscular') is not None:
+                return bio['massa_muscular'], 'bioimpedancia'
+
             mm = row.get('Massa_Magra_kg')
             if mm is None or pd.isna(mm):
-                return np.nan
-            try:
-                return round(float(mm) * 0.55, 1)
-            except (TypeError, ValueError):
-                return np.nan
+                return np.nan, 'sem_dados'
+            return round(mm * 0.55, 1), 'estimada'
 
-        df['Massa_Muscular_Estimada_kg'] = df.apply(calc_massa_muscular, axis=1)
+        mu_final = df.apply(massa_muscular_final, axis=1, result_type='expand')
+        df['Massa_Muscular_Estimada_kg'] = mu_final[0]
+        df['Origem_Massa_Muscular']      = mu_final[1]
 
+        # ====================================================================
+        # COLUNAS DA BIOIMPEDÂNCIA (para exibição quando existirem)
+        # ====================================================================
+        def _bio_campo(campo):
+            def f(row):
+                bio = row.get('_bio')
+                return bio.get(campo) if bio else np.nan
+            return f
+
+        df['Bio_Peso_kg']           = df.apply(_bio_campo('peso'),           axis=1)
+        df['Bio_Altura_cm']         = df.apply(_bio_campo('altura_cm'),      axis=1)
+        df['Bio_Gordura_%']         = df.apply(_bio_campo('gordura'),        axis=1)
+        df['Bio_Massa_Magra_kg']    = df.apply(_bio_campo('massa_magra'),    axis=1)
+        df['Bio_Massa_Muscular_kg'] = df.apply(_bio_campo('massa_muscular'), axis=1)
+        df['Bio_Data_Coleta']       = df.apply(_bio_campo('data_coleta'),    axis=1)
+
+        # ====================================================================
+        # CLASSIFICAÇÃO FINAL
+        # ====================================================================
         df['Classificacao_Gordura'] = df.apply(
             lambda x: classif_gordura(
                 x.get('Gordura_Corporal_%'), x.get('Idade')
-            ), axis=1
+            ) if x.get('Origem_Gordura') != 'sem_dados' else None,
+            axis=1,
         )
         df['Estado_Fisico'] = df.apply(
             lambda row: estado_fisico(
@@ -244,6 +404,9 @@ def carregar_dados_elenco(categoria):
             ), axis=1
         )
 
+        # ====================================================================
+        # POSIÇÃO
+        # ====================================================================
         def cat_pos(pos_str):
             if pd.isna(pos_str):
                 return 'Outros'
@@ -271,6 +434,9 @@ def carregar_dados_elenco(categoria):
 
         df['Posicao_Principal'] = df['posicao'].apply(cat_pos)
 
+        # ====================================================================
+        # RATING GERAL
+        # ====================================================================
         def calc_rating(valor):
             if pd.notna(valor):
                 try:
@@ -284,10 +450,32 @@ def carregar_dados_elenco(categoria):
         else:
             df['Rating_Geral_FM26'] = 50
 
+        # ====================================================================
+        # ATRIBUTOS FM26 AGRUPADOS
+        # ====================================================================
         df['atributos_fm26'] = df.apply(agrupar_atributos_jogador, axis=1)
         df = df[df['nome_completo'].notna()]
 
-        print(f"✅ Elenco {categoria} carregado com {len(df)} jogadores.")
+        # Limpa coluna interna
+        df = df.drop(columns=['_bio'], errors='ignore')
+
+        # ====================================================================
+        # LOG DE CONFERÊNCIA
+        # ====================================================================
+        cols_debug = [
+            'nome_completo', 'IMC', 'Classificacao_IMC', 'Idade',
+            'Gordura_Faulkner_%', 'Massa_Magra_Faulkner_kg', 'Massa_Muscular_Faulkner_kg',
+            'Gordura_Pollock_%',  'Massa_Magra_Pollock_kg',  'Massa_Muscular_Pollock_kg',
+            'Gordura_Lee_%',      'Massa_Magra_Lee_kg',      'Massa_Muscular_Lee_kg',
+            'Bio_Gordura_%', 'Bio_Massa_Magra_kg', 'Bio_Massa_Muscular_kg',
+            'Gordura_Corporal_%', 'Massa_Magra_kg', 'Massa_Muscular_Estimada_kg',
+            'Origem_Gordura', 'Classificacao_Gordura', 'Estado_Fisico',
+        ]
+        cols_debug = [c for c in cols_debug if c in df.columns]
+        print("\n📊 Conferência IMC / Gordura / Bioimpedância:")
+        print(df[cols_debug].head(10).to_string(index=False))
+
+        print(f"\n✅ Elenco {categoria} carregado com {len(df)} jogadores.")
         return df
 
     except Exception as e:
@@ -939,6 +1127,11 @@ def adicionar_lesao_com_data_fim(csv_path, nome_jogador, tipo_lesao, data_fim):
 # ============================================================================
 
 def carregar_bioimpedancia(categoria):
+    """
+    Retorna dict {nome_completo: {peso, altura, gordura, ...}}.
+    Mantida para compatibilidade — a versão usada internamente agora é
+    carregar_bioimpedancia_por_jogador (indexa por ogol_id e por nome).
+    """
     caminho = Config.ARQUIVOS_BIO.get(categoria)
     if not caminho or not os.path.exists(caminho):
         return {}
@@ -972,3 +1165,57 @@ def carregar_bioimpedancia(categoria):
     except Exception as e:
         print(f"❌ Erro ao carregar bioimpedância {categoria}: {e}")
         return {}
+
+
+def carregar_bioimpedancia_por_jogador(categoria):
+    """
+    Lê o CSV de bioimpedância e devolve dois dicionários:
+      - por_id:   {ogol_id (int): dados}
+      - por_nome: {nome_completo (str): dados}
+
+    Cada 'dados' contém:
+      peso, altura, altura_cm, gordura, massa_magra, massa_muscular,
+      data_coleta, origem
+    """
+    caminho = Config.ARQUIVOS_BIO.get(categoria)
+    if not caminho or not os.path.exists(caminho):
+        return {}, {}
+
+    try:
+        df = pd.read_csv(caminho, delimiter=';', encoding='utf-8-sig', dtype=str)
+        por_id, por_nome = {}, {}
+
+        for _, row in df.iterrows():
+            nome = (row.get('nome_completo') or '').strip()
+            ogol_id = row.get('ogol_id')
+
+            def parse(val):
+                if pd.isna(val):
+                    return None
+                return safe_float(val)
+
+            altura_cm = parse(row.get('altura_cm'))
+            registro = {
+                'peso':           parse(row.get('peso_kg')),
+                'altura':         altura_cm / 100.0 if altura_cm else None,
+                'altura_cm':      altura_cm,
+                'gordura':        parse(row.get('gordura_corporal')),
+                'massa_magra':    parse(row.get('massa_magra')),
+                'massa_muscular': parse(row.get('massa_muscular')),
+                'data_coleta':    row.get('data_bioimpedancia'),
+                'origem':         'bioimpedancia',
+            }
+
+            if ogol_id and pd.notna(ogol_id):
+                try:
+                    por_id[int(float(ogol_id))] = registro
+                except (ValueError, TypeError):
+                    pass
+            if nome:
+                por_nome[nome] = registro
+
+        return por_id, por_nome
+
+    except Exception as e:
+        print(f"❌ Erro ao carregar bioimpedância {categoria}: {e}")
+        return {}, {}
