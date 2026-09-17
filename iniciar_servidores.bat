@@ -9,9 +9,9 @@ if not "%1"=="minimized" (
 title Vilavelhense FC - Servidores (Funnel + Backend)
 setlocal enabledelayedexpansion
 
-REM 🔥 Aguarda 30s para o Windows/Tailscale/rede iniciarem
-echo Aguardando inicializacao do Windows (30s)...
-timeout /t 30 /nobreak >nul
+REM 🔥 Aguarda 60s para o Windows/Tailscale/rede iniciarem
+echo Aguardando inicializacao do Windows (60s)...
+timeout /t 60 /nobreak >nul
 echo [OK] Iniciando servidores...
 
 REM ============================================================
