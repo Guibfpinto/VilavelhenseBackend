@@ -79,11 +79,11 @@ def safe_float(valor):
 def parse_numero_coluna(serie):
     if serie is None:
         return serie
-    return pd.to_numeric(
-        serie.astype(str).str.replace(',', '.').str.replace('', '0'),
-        errors='coerce'
-    )
-
+    # Converte para string e troca vírgula decimal por ponto
+    s = serie.astype(str).str.replace(',', '.', regex=False)
+    # Substitui SOMENTE valores vazios/nulos por '0' (sem mexer nos reais)
+    s = s.where(~s.str.strip().isin(['', 'nan', 'None', 'NaN', '<NA>']), '0')
+    return pd.to_numeric(s, errors='coerce')
 
 def safe_divide(numerador, denominador):
     if denominador is None or pd.isna(denominador) or denominador == 0:
