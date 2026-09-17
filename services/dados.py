@@ -1,4 +1,4 @@
-# services/dados.py - Versão final: valores do CSV mantidos como estão
+# services/dados.py - Classificação via atributos_mapper
 
 import os
 import pandas as pd
@@ -7,10 +7,11 @@ from config import Config
 from utils.datas import calcular_idade
 from services.bioimpedancia import classif_imc, classif_gordura, estado_fisico
 from services.cartoes_service import mapear_nome_para_canonico
+from services.atributos_mapper import classificar_por_tipo
 
 
 # ============================================================================
-# TRADUÇÃO DE ATRIBUTOS DE STAFF (COMISSÃO)
+# TRADUÇÃO DE NOMES (COMISSÃO)
 # ============================================================================
 
 TRADUCAO_ATRIBUTOS_COMISSAO = {
@@ -60,57 +61,10 @@ TRADUCAO_ATRIBUTOS_COMISSAO = {
 
 
 # ============================================================================
-# TRADUÇÃO DE ATRIBUTOS DA DIRETORIA
-# ============================================================================
-
-TRADUCAO_ATRIBUTOS_DIRETORIA = {
-    'ca_diretoria': 'CA',
-    'pa_diretoria': 'PA',
-    'reputacao_mundial': 'Reputação Mundial',
-    'reputacao_atual': 'Reputação Atual',
-    'reputacao_local': 'Reputação Local',
-    'habilidade_negocios': 'Habilidade de Negócios',
-    'interferencia': 'Interferência',
-    'paciencia_diretoria': 'Paciência',
-    'recursos_financeiros': 'Recursos Financeiros',
-    'compra_jogadores': 'Compra de Jogadores',
-    'intensidade_treino': 'Intensidade do Treino',
-    'jogos_mentais': 'Jogos Mentais',
-    'rotacao_elenco': 'Rotação do Elenco',
-    'adaptabilidade': 'Adaptabilidade',
-    'determinacao': 'Determinação',
-    'julgamento_jogador': 'Julgamento de Jogador',
-    'julgamento_potencial': 'Julgamento de Potencial',
-    'julgamento_staff': 'Julgamento de Staff',
-    'negociacao': 'Negociação',
-    'autoridade': 'Autoridade',
-    'motivacao': 'Motivação',
-    'conhecimento_tatico': 'Conhecimento Tático',
-    'analise_dados_jogador': 'Análise de Dados de Jogador',
-    'analise_dados_time': 'Análise de Dados de Time',
-    'apresentacao_dados': 'Apresentação de Dados',
-    'gestao_pessoas': 'Gestão de Pessoas',
-    'trabalho_jovens': 'Trabalho com Jovens',
-    'bolas_paradas': 'Bolas Paradas',
-    'tolerancia_sujeira': 'Tolerância à Sujeira',
-    'versatilidade': 'Versatilidade',
-    'ambicao': 'Ambição',
-    'lealdade': 'Lealdade',
-    'pressao': 'Pressão',
-    'profissionalismo': 'Profissionalismo',
-    'esportividade': 'Espírito Esportivo',
-    'temperamento': 'Temperamento',
-    'controversia': 'Controvérsia',
-    'personalidade': 'Personalidade',
-}
-
-
-# ============================================================================
 # FUNÇÕES AUXILIARES
 # ============================================================================
 
 def safe_float(valor):
-    """Converte string com vírgula decimal para float."""
     if pd.isna(valor) or valor is None or str(valor).strip() == '':
         return None
     try:
@@ -120,7 +74,6 @@ def safe_float(valor):
 
 
 def parse_numero_coluna(serie):
-    """Converte série pandas para numérico, tratando vírgula."""
     if serie is None:
         return serie
     return pd.to_numeric(
@@ -130,43 +83,20 @@ def parse_numero_coluna(serie):
 
 
 def safe_divide(numerador, denominador):
-    """Divisão segura."""
     if denominador is None or pd.isna(denominador) or denominador == 0:
         return np.nan
     return numerador / denominador
 
 
-def normalizar_valor_atributo(valor):
-    """
-    🔥 Apenas converte para número INTEIRO.
-    NÃO divide, NÃO corta. O CSV já tem valores na escala correta.
-    """
+def classificar(valor, tipo):
+    """Wrapper seguro: retorna apenas o label classificado."""
     if pd.isna(valor) or valor is None:
-        return valor
+        return None
     try:
-        return int(float(str(valor).replace(',', '.')))
+        v = int(float(str(valor).replace(',', '.')))
     except (ValueError, TypeError):
-        return valor
-
-
-def normalizar_atributo(valor):
-    """Alias para normalizar_valor_atributo."""
-    return normalizar_valor_atributo(valor)
-
-
-def manter_valor_original(valor):
-    """
-    Mantém o valor original (para CA, PA e Reputação).
-    """
-    if valor is None or pd.isna(valor):
-        return valor
-    try:
-        v = float(str(valor).replace(',', '.'))
-        if v.is_integer():
-            return int(v)
-        return v
-    except (ValueError, TypeError):
-        return valor
+        return None
+    return classificar_por_tipo(v, tipo)
 
 
 # ============================================================================
@@ -174,7 +104,6 @@ def manter_valor_original(valor):
 # ============================================================================
 
 def carregar_dados_elenco(categoria):
-    """Carrega o CSV do elenco de jogadores."""
     caminho = Config.ARQUIVOS_CSV.get(categoria)
     if not caminho or not os.path.exists(caminho):
         print(f"Arquivo não encontrado: {caminho}")
@@ -214,10 +143,9 @@ def carregar_dados_elenco(categoria):
             if col in df.columns:
                 df[col] = parse_numero_coluna(df[col])
 
-        # 🔥 ATRIBUTOS DOS JOGADORES: apenas converte para int
         for attr in Config.ATRIBUTOS_FM26_JOGADORES:
             if attr in df.columns:
-                df[attr] = df[attr].apply(normalizar_valor_atributo)
+                df[attr] = parse_numero_coluna(df[attr])
 
         estatisticas_jogador = [
             'jogos_temporada', 'gols_totais', 'assistencias_totais',
@@ -296,15 +224,13 @@ def carregar_dados_elenco(categoria):
         df['Classificacao_Gordura'] = df.apply(
             lambda x: classif_gordura(
                 x.get('Gordura_Corporal_%'), x.get('Idade')
-            ),
-            axis=1
+            ), axis=1
         )
         df['Estado_Fisico'] = df.apply(
             lambda row: estado_fisico(
                 row.get('Classificacao_IMC'),
                 row.get('Classificacao_Gordura')
-            ),
-            axis=1
+            ), axis=1
         )
 
         def cat_pos(pos_str):
@@ -361,11 +287,10 @@ def carregar_dados_elenco(categoria):
 
 
 # ============================================================================
-# CARREGAMENTO DA COMISSÃO TÉCNICA
+# CARREGAMENTO DA COMISSÃO
 # ============================================================================
 
 def carregar_dados_comissao(categoria):
-    """Carrega CSV da comissão técnica."""
     caminho = Config.ARQUIVOS_CSV.get(categoria)
     if not caminho or not os.path.exists(caminho):
         return None
@@ -437,7 +362,6 @@ def carregar_dados_comissao(categoria):
 # ============================================================================
 
 def carregar_dados_diretoria(categoria='diretoria'):
-    """Carrega CSV da diretoria."""
     caminho = Config.ARQUIVOS_CSV.get(categoria)
     if not caminho or not os.path.exists(caminho):
         print(f"Arquivo da diretoria não encontrado: {caminho}")
@@ -511,20 +435,23 @@ def carregar_dados_diretoria(categoria='diretoria'):
 
 
 # ============================================================================
-# AGRUPAMENTO DE ATRIBUTOS - JOGADORES
+# AGRUPAMENTO - JOGADORES (retorna APENAS classificação)
 # ============================================================================
 
 def agrupar_atributos_jogador(row):
-    """Agrupa atributos do jogador (valores como estão no CSV)."""
+    """Agrupa atributos do jogador retornando APENAS a classificação."""
     atributos = {}
+
     tecnicos = [
         'escanteios', 'cruzamentos', 'drible', 'finalizacao', 'primeiro_controle',
         'cobranca_faltas', 'cabecada', 'chutes_longe', 'arremessos_laterais',
         'marcacao', 'passe', 'cobranca_penaltis', 'desarme', 'tecnica',
     ]
     atributos['tecnicos'] = {
-        a: row.get(a) for a in tecnicos if a in row and pd.notna(row.get(a))
+        a: classificar(row.get(a), "habilidade") for a in tecnicos
+        if a in row and pd.notna(row.get(a))
     }
+
     mentais = [
         'agressividade', 'antecipacao', 'coragem', 'composicao', 'concentracao',
         'decisao', 'determinacao', 'criatividade', 'lideranca',
@@ -532,78 +459,92 @@ def agrupar_atributos_jogador(row):
         'visao_jogo', 'intensidade_trabalho',
     ]
     atributos['mentais'] = {
-        a: row.get(a) for a in mentais if a in row and pd.notna(row.get(a))
+        a: classificar(row.get(a), "habilidade") for a in mentais
+        if a in row and pd.notna(row.get(a))
     }
+
     fisicos = [
         'aceleracao', 'agilidade', 'equilibrio', 'altura_salto',
         'condicao_fisica_natural', 'velocidade_maxima', 'resistencia',
         'forca_fisica',
     ]
     atributos['fisicos'] = {
-        a: row.get(a) for a in fisicos if a in row and pd.notna(row.get(a))
+        a: classificar(row.get(a), "habilidade") for a in fisicos
+        if a in row and pd.notna(row.get(a))
     }
+
     goleiro = [
         'reflexos', 'jogo_aereo_goleiro', 'defesas_goleiro', 'comando_area',
         'comunicacao_goleiro', 'chutes_goleiro', 'um_contra_um_goleiro',
         'saida_gol', 'tendencia_socar', 'arremessos_goleiro', 'excentricidade',
     ]
     atributos['goleiro'] = {
-        a: row.get(a) for a in goleiro if a in row and pd.notna(row.get(a))
+        a: classificar(row.get(a), "habilidade") for a in goleiro
+        if a in row and pd.notna(row.get(a))
     }
+
     ocultos = [
         'consistencia', 'jogo_sujo', 'jogos_importantes',
         'propensao_lesao', 'versatilidade',
     ]
     atributos['ocultos'] = {
-        a: row.get(a) for a in ocultos if a in row and pd.notna(row.get(a))
+        a: classificar(row.get(a), "habilidade") for a in ocultos
+        if a in row and pd.notna(row.get(a))
     }
+
     personalidade = [
         'adaptabilidade', 'ambicao', 'lealdade', 'pressao',
         'profissionalismo', 'esportividade', 'temperamento', 'controversia',
     ]
     atributos['personalidade'] = {
-        a: row.get(a) for a in personalidade if a in row and pd.notna(row.get(a))
+        a: classificar(row.get(a), "habilidade") for a in personalidade
+        if a in row and pd.notna(row.get(a))
     }
+
     return atributos
 
 
 # ============================================================================
-# AGRUPAMENTO DE ATRIBUTOS - COMISSÃO
+# AGRUPAMENTO - COMISSÃO (retorna APENAS classificação)
 # ============================================================================
 
 def agrupar_atributos_comissao(row):
-    """Agrupa atributos da comissão.
-    CA, PA e Reputação mantêm o valor original.
-    Outros são apenas convertidos para int (sem divisão).
+    """Agrupa atributos da comissão retornando APENAS a classificação.
+    CA/PA → ca_pa | Reputação → reputacao | Outros → habilidade
     """
     atributos = {}
 
-    # CA, PA e Reputação (valor original)
-    campos_originais = {
-        'ca': 'CA',
-        'pa': 'PA',
-        'reputacao_mundial': 'Reputação Mundial',
-        'reputacao_atual': 'Reputação Atual',
-        'reputacao_local': 'Reputação Local',
-    }
+    # ---- Gerais ----
     atributos['gerais'] = {}
-    for campo, label in campos_originais.items():
-        if campo in row and pd.notna(row.get(campo)):
-            atributos['gerais'][label] = manter_valor_original(row.get(campo))
+
+    if 'ca' in row and pd.notna(row.get('ca')):
+        atributos['gerais']['CA'] = classificar(row.get('ca'), "ca_pa")
+    if 'pa' in row and pd.notna(row.get('pa')):
+        atributos['gerais']['PA'] = classificar(row.get('pa'), "ca_pa")
+
+    # Reputação
+    if 'reputacao_mundial' in row and pd.notna(row.get('reputacao_mundial')):
+        atributos['gerais']['Reputação Mundial'] = classificar(
+            row.get('reputacao_mundial'), "reputacao"
+        )
+    if 'reputacao_atual' in row and pd.notna(row.get('reputacao_atual')):
+        atributos['gerais']['Reputação Atual'] = classificar(
+            row.get('reputacao_atual'), "reputacao"
+        )
+    if 'reputacao_local' in row and pd.notna(row.get('reputacao_local')):
+        atributos['gerais']['Reputação Local'] = classificar(
+            row.get('reputacao_local'), "reputacao"
+        )
 
     # Outros gerais
     outros_gerais = ['qualificacoes_treinador', 'jogos_selecao', 'gols_selecao']
     for a in outros_gerais:
         if a in row and pd.notna(row.get(a)):
-            chave_original = a.replace('_', ' ').title()
-            chave_traduzida = TRADUCAO_ATRIBUTOS_COMISSAO.get(
-                chave_original, chave_original
-            )
-            atributos['gerais'][chave_traduzida] = normalizar_valor_atributo(
-                row.get(a)
-            )
+            chave = a.replace('_', ' ').title()
+            chave_t = TRADUCAO_ATRIBUTOS_COMISSAO.get(chave, chave)
+            atributos['gerais'][chave_t] = classificar(row.get(a), "habilidade")
 
-    # Treinamento
+    # ---- Treinamento ----
     coaching = [
         'coachingattributes_attacking', 'coachingattributes_defending',
         'coachingattributes_fitness', 'coachingattributes_goalkeeping',
@@ -617,17 +558,11 @@ def agrupar_atributos_comissao(row):
     atributos['treinamento'] = {}
     for a in coaching:
         if a in row and pd.notna(row.get(a)):
-            chave_original = (
-                a.replace('coachingattributes_', '').replace('_', ' ').title()
-            )
-            chave_traduzida = TRADUCAO_ATRIBUTOS_COMISSAO.get(
-                chave_original, chave_original
-            )
-            atributos['treinamento'][chave_traduzida] = normalizar_valor_atributo(
-                row.get(a)
-            )
+            chave = a.replace('coachingattributes_', '').replace('_', ' ').title()
+            chave_t = TRADUCAO_ATRIBUTOS_COMISSAO.get(chave, chave)
+            atributos['treinamento'][chave_t] = classificar(row.get(a), "habilidade")
 
-    # Staff Mental
+    # ---- Staff Mental ----
     staff_mental = [
         'staffmentalattributes_adaptability',
         'staffmentalattributes_determination',
@@ -643,17 +578,11 @@ def agrupar_atributos_comissao(row):
     atributos['staff_mental'] = {}
     for a in staff_mental:
         if a in row and pd.notna(row.get(a)):
-            chave_original = (
-                a.replace('staffmentalattributes_', '').replace('_', ' ').title()
-            )
-            chave_traduzida = TRADUCAO_ATRIBUTOS_COMISSAO.get(
-                chave_original, chave_original
-            )
-            atributos['staff_mental'][chave_traduzida] = normalizar_valor_atributo(
-                row.get(a)
-            )
+            chave = a.replace('staffmentalattributes_', '').replace('_', ' ').title()
+            chave_t = TRADUCAO_ATRIBUTOS_COMISSAO.get(chave, chave)
+            atributos['staff_mental'][chave_t] = classificar(row.get(a), "habilidade")
 
-    # Táticas
+    # ---- Táticas ----
     taticas = [
         'tacticalattributes_attacking', 'tacticalattributes_depth',
         'tacticalattributes_directness', 'tacticalattributes_flamboyancy',
@@ -666,17 +595,11 @@ def agrupar_atributos_comissao(row):
     atributos['taticas'] = {}
     for a in taticas:
         if a in row and pd.notna(row.get(a)):
-            chave_original = (
-                a.replace('tacticalattributes_', '').replace('_', ' ').title()
-            )
-            chave_traduzida = TRADUCAO_ATRIBUTOS_COMISSAO.get(
-                chave_original, chave_original
-            )
-            atributos['taticas'][chave_traduzida] = normalizar_valor_atributo(
-                row.get(a)
-            )
+            chave = a.replace('tacticalattributes_', '').replace('_', ' ').title()
+            chave_t = TRADUCAO_ATRIBUTOS_COMISSAO.get(chave, chave)
+            atributos['taticas'][chave_t] = classificar(row.get(a), "habilidade")
 
-    # Scouting
+    # ---- Scouting ----
     scouting = [
         'scoutingattributes_judgingplayerdata',
         'scoutingattributes_judgingteamdata',
@@ -685,30 +608,20 @@ def agrupar_atributos_comissao(row):
     atributos['scouting'] = {}
     for a in scouting:
         if a in row and pd.notna(row.get(a)):
-            chave_original = (
-                a.replace('scoutingattributes_', '').replace('_', ' ').title()
-            )
-            chave_traduzida = TRADUCAO_ATRIBUTOS_COMISSAO.get(
-                chave_original, chave_original
-            )
-            atributos['scouting'][chave_traduzida] = normalizar_valor_atributo(
-                row.get(a)
-            )
+            chave = a.replace('scoutingattributes_', '').replace('_', ' ').title()
+            chave_t = TRADUCAO_ATRIBUTOS_COMISSAO.get(chave, chave)
+            atributos['scouting'][chave_t] = classificar(row.get(a), "habilidade")
 
-    # Médica
+    # ---- Médica ----
     if 'medicalattributes_sportsscience' in row and pd.notna(
         row.get('medicalattributes_sportsscience')
     ):
-        chave = TRADUCAO_ATRIBUTOS_COMISSAO.get(
-            'Sports Science', 'Sports Science'
-        )
+        chave = TRADUCAO_ATRIBUTOS_COMISSAO.get('Sports Science', 'Sports Science')
         atributos['medica'] = {
-            chave: normalizar_valor_atributo(
-                row.get('medicalattributes_sportsscience')
-            )
+            chave: classificar(row.get('medicalattributes_sportsscience'), "habilidade")
         }
 
-    # Personalidade
+    # ---- Personalidade ----
     personalidade = [
         'personalityattributes_adaptability', 'personalityattributes_ambition',
         'personalityattributes_loyalty', 'personalityattributes_pressure',
@@ -718,17 +631,11 @@ def agrupar_atributos_comissao(row):
     atributos['personalidade'] = {}
     for a in personalidade:
         if a in row and pd.notna(row.get(a)):
-            chave_original = (
-                a.replace('personalityattributes_', '').replace('_', ' ').title()
-            )
-            chave_traduzida = TRADUCAO_ATRIBUTOS_COMISSAO.get(
-                chave_original, chave_original
-            )
-            atributos['personalidade'][chave_traduzida] = normalizar_valor_atributo(
-                row.get(a)
-            )
+            chave = a.replace('personalityattributes_', '').replace('_', ' ').title()
+            chave_t = TRADUCAO_ATRIBUTOS_COMISSAO.get(chave, chave)
+            atributos['personalidade'][chave_t] = classificar(row.get(a), "habilidade")
 
-    # Funções
+    # ---- Funções ----
     roles = [
         'rolesattributes_assistantmanager', 'rolesattributes_coach',
         'rolesattributes_fitnesscoach', 'rolesattributes_goalkeepingcoach',
@@ -743,43 +650,46 @@ def agrupar_atributos_comissao(row):
     atributos['funcoes'] = {}
     for a in roles:
         if a in row and pd.notna(row.get(a)):
-            chave_original = (
-                a.replace('rolesattributes_', '').replace('_', ' ').title()
-            )
-            chave_traduzida = TRADUCAO_ATRIBUTOS_COMISSAO.get(
-                chave_original, chave_original
-            )
-            atributos['funcoes'][chave_traduzida] = normalizar_valor_atributo(
-                row.get(a)
-            )
+            chave = a.replace('rolesattributes_', '').replace('_', ' ').title()
+            chave_t = TRADUCAO_ATRIBUTOS_COMISSAO.get(chave, chave)
+            atributos['funcoes'][chave_t] = classificar(row.get(a), "habilidade")
 
     return {k: v for k, v in atributos.items() if v}
 
 
 # ============================================================================
-# AGRUPAMENTO DE ATRIBUTOS - DIRETORIA
+# AGRUPAMENTO - DIRETORIA (retorna APENAS classificação)
 # ============================================================================
 
 def agrupar_atributos_diretoria(row):
-    """Agrupa atributos da Diretoria.
-    CA, PA e Reputação mantêm o valor original.
+    """Agrupa atributos da diretoria retornando APENAS a classificação.
+    CA/PA → ca_pa | Reputação → reputacao | Outros → habilidade
     """
     atributos = {}
 
-    # CA, PA e Reputação (valor original)
-    campos_originais = {
-        'ca_diretoria': 'CA',
-        'pa_diretoria': 'PA',
-        'reputacao_mundial': 'Reputação Mundial',
-        'reputacao_atual': 'Reputação Atual',
-        'reputacao_local': 'Reputação Local',
-    }
+    # ---- Gerais ----
     atributos['gerais'] = {}
-    for campo, label in campos_originais.items():
-        if campo in row and pd.notna(row.get(campo)):
-            atributos['gerais'][label] = manter_valor_original(row.get(campo))
 
-    # Presidência
+    if 'ca_diretoria' in row and pd.notna(row.get('ca_diretoria')):
+        atributos['gerais']['CA'] = classificar(row.get('ca_diretoria'), "ca_pa")
+    if 'pa_diretoria' in row and pd.notna(row.get('pa_diretoria')):
+        atributos['gerais']['PA'] = classificar(row.get('pa_diretoria'), "ca_pa")
+
+    # Reputação
+    if 'reputacao_mundial' in row and pd.notna(row.get('reputacao_mundial')):
+        atributos['gerais']['Reputação Mundial'] = classificar(
+            row.get('reputacao_mundial'), "reputacao"
+        )
+    if 'reputacao_atual' in row and pd.notna(row.get('reputacao_atual')):
+        atributos['gerais']['Reputação Atual'] = classificar(
+            row.get('reputacao_atual'), "reputacao"
+        )
+    if 'reputacao_local' in row and pd.notna(row.get('reputacao_local')):
+        atributos['gerais']['Reputação Local'] = classificar(
+            row.get('reputacao_local'), "reputacao"
+        )
+
+    # ---- Presidência ----
     presidencia = {
         'habilidade_negocios': 'Habilidade de Negócios',
         'interferencia': 'Interferência',
@@ -789,11 +699,9 @@ def agrupar_atributos_diretoria(row):
     atributos['presidencia'] = {}
     for col, label in presidencia.items():
         if col in row and pd.notna(row.get(col)):
-            atributos['presidencia'][label] = normalizar_valor_atributo(
-                row.get(col)
-            )
+            atributos['presidencia'][label] = classificar(row.get(col), "habilidade")
 
-    # Não-Táticos
+    # ---- Não-Táticos ----
     nao_taticos = {
         'compra_jogadores': 'Compra de Jogadores',
         'intensidade_treino': 'Intensidade do Treino',
@@ -803,11 +711,9 @@ def agrupar_atributos_diretoria(row):
     atributos['nao_taticos'] = {}
     for col, label in nao_taticos.items():
         if col in row and pd.notna(row.get(col)):
-            atributos['nao_taticos'][label] = normalizar_valor_atributo(
-                row.get(col)
-            )
+            atributos['nao_taticos'][label] = classificar(row.get(col), "habilidade")
 
-    # Staff Mental
+    # ---- Staff Mental ----
     staff_mental = {
         'adaptabilidade': 'Adaptabilidade',
         'determinacao': 'Determinação',
@@ -822,11 +728,9 @@ def agrupar_atributos_diretoria(row):
     atributos['staff_mental'] = {}
     for col, label in staff_mental.items():
         if col in row and pd.notna(row.get(col)):
-            atributos['staff_mental'][label] = normalizar_valor_atributo(
-                row.get(col)
-            )
+            atributos['staff_mental'][label] = classificar(row.get(col), "habilidade")
 
-    # Scouting
+    # ---- Scouting ----
     scouting = {
         'analise_dados_jogador': 'Análise de Dados de Jogador',
         'analise_dados_time': 'Análise de Dados de Time',
@@ -835,9 +739,9 @@ def agrupar_atributos_diretoria(row):
     atributos['scouting'] = {}
     for col, label in scouting.items():
         if col in row and pd.notna(row.get(col)):
-            atributos['scouting'][label] = normalizar_valor_atributo(row.get(col))
+            atributos['scouting'][label] = classificar(row.get(col), "habilidade")
 
-    # Treinamento
+    # ---- Treinamento ----
     treinamento = {
         'gestao_pessoas': 'Gestão de Pessoas',
         'trabalho_jovens': 'Trabalho com Jovens',
@@ -848,11 +752,9 @@ def agrupar_atributos_diretoria(row):
     atributos['treinamento'] = {}
     for col, label in treinamento.items():
         if col in row and pd.notna(row.get(col)):
-            atributos['treinamento'][label] = normalizar_valor_atributo(
-                row.get(col)
-            )
+            atributos['treinamento'][label] = classificar(row.get(col), "habilidade")
 
-    # Personalidade
+    # ---- Personalidade ----
     personalidade = {
         'ambicao': 'Ambição',
         'lealdade': 'Lealdade',
@@ -866,11 +768,9 @@ def agrupar_atributos_diretoria(row):
     atributos['personalidade'] = {}
     for col, label in personalidade.items():
         if col in row and pd.notna(row.get(col)):
-            atributos['personalidade'][label] = normalizar_valor_atributo(
-                row.get(col)
-            )
+            atributos['personalidade'][label] = classificar(row.get(col), "habilidade")
 
-    # Informações
+    # ---- Informações ----
     info = {
         'nacionalidade': 'Nacionalidade',
         'clube': 'Clube',
@@ -893,15 +793,12 @@ def agrupar_atributos_diretoria(row):
 # ============================================================================
 
 def carregar_lesoes(categoria):
-    """Carrega lesões ativas de uma categoria."""
     caminho = Config.ARQUIVOS_LESOES.get(categoria)
     if not caminho or not os.path.exists(caminho):
         return {}
 
     try:
-        df = pd.read_csv(
-            caminho, delimiter=';', encoding='utf-8-sig', dtype=str
-        )
+        df = pd.read_csv(caminho, delimiter=';', encoding='utf-8-sig', dtype=str)
         lesionados = {}
 
         for _, row in df.iterrows():
@@ -938,7 +835,6 @@ def carregar_lesoes(categoria):
 
 
 def adicionar_lesao(csv_path, nome_jogador, tipo_lesao, data_inicio, data_fim=None):
-    """Adiciona uma ocorrência de lesão para um jogador no CSV."""
     if not os.path.exists(csv_path):
         print(f"❌ Arquivo não encontrado: {csv_path}")
         return False
@@ -957,25 +853,18 @@ def adicionar_lesao(csv_path, nome_jogador, tipo_lesao, data_inicio, data_fim=No
         return False
 
     coluna_lesao = f"Lesao_{tipo_lesao.replace(' ', '_').title()}"
-
     if coluna_lesao not in df.columns:
         df[coluna_lesao] = ''
 
     match = df[df['nome_completo'] == nome_jogador]
-
     if match.empty:
         print(f"⚠️  Jogador '{nome_jogador}' não encontrado no CSV.")
         return False
 
     idx = match.index[0]
-
-    if data_fim:
-        nova_ocorrencia = f"{data_inicio} - {data_fim}"
-    else:
-        nova_ocorrencia = data_inicio
+    nova_ocorrencia = f"{data_inicio} - {data_fim}" if data_fim else data_inicio
 
     valor_atual = df.at[idx, coluna_lesao]
-
     if pd.isna(valor_atual) or str(valor_atual).strip() == '':
         df.at[idx, coluna_lesao] = nova_ocorrencia
     else:
@@ -991,9 +880,7 @@ def adicionar_lesao(csv_path, nome_jogador, tipo_lesao, data_inicio, data_fim=No
 
 
 def adicionar_lesao_com_data_fim(csv_path, nome_jogador, tipo_lesao, data_fim):
-    """Adiciona uma data de fim para a última ocorrência de lesão."""
     if not os.path.exists(csv_path):
-        print(f"❌ Arquivo não encontrado: {csv_path}")
         return False
 
     try:
@@ -1006,28 +893,22 @@ def adicionar_lesao_com_data_fim(csv_path, nome_jogador, tipo_lesao, data_fim):
         return False
 
     coluna_lesao = f"Lesao_{tipo_lesao.replace(' ', '_').title()}"
-
     if coluna_lesao not in df.columns:
-        print(f"❌ Coluna '{coluna_lesao}' não encontrada.")
         return False
 
     match = df[df['nome_completo'] == nome_jogador]
     if match.empty:
-        print(f"❌ Jogador '{nome_jogador}' não encontrado.")
         return False
 
     idx = match.index[0]
     valor = df.at[idx, coluna_lesao]
-
     if pd.isna(valor) or str(valor).strip() == '':
-        print(f"❌ Nenhuma lesão registrada para {nome_jogador} ({tipo_lesao}).")
         return False
 
     ocorrencias = [o.strip() for o in str(valor).split(',')]
     ultima = ocorrencias[-1]
 
     if ' - ' in ultima or '–' in ultima:
-        print(f"⚠️  Última ocorrência já tem data de fim: {ultima}")
         return False
 
     ocorrencias[-1] = f"{ultima} - {data_fim}"
@@ -1047,15 +928,12 @@ def adicionar_lesao_com_data_fim(csv_path, nome_jogador, tipo_lesao, data_fim):
 # ============================================================================
 
 def carregar_bioimpedancia(categoria):
-    """Carrega dados de bioimpedância."""
     caminho = Config.ARQUIVOS_BIO.get(categoria)
     if not caminho or not os.path.exists(caminho):
         return {}
 
     try:
-        df = pd.read_csv(
-            caminho, delimiter=';', encoding='utf-8-sig', dtype=str
-        )
+        df = pd.read_csv(caminho, delimiter=';', encoding='utf-8-sig', dtype=str)
         dados = {}
 
         for _, row in df.iterrows():
