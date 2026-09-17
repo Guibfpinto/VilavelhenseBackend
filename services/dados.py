@@ -7,7 +7,10 @@ from config import Config
 from utils.datas import calcular_idade
 from services.bioimpedancia import classif_imc, classif_gordura, estado_fisico
 from services.cartoes_service import mapear_nome_para_canonico
-from services.atributos_mapper import classificar_por_tipo
+from services.atributos_mapper import (
+    classificar_por_tipo,
+    normalizar_valor_atributo,
+)
 
 
 # ============================================================================
@@ -89,14 +92,22 @@ def safe_divide(numerador, denominador):
 
 
 def classificar(valor, tipo):
-    """Wrapper seguro: retorna apenas o label classificado."""
+    """
+    Wrapper seguro:
+      1) Normaliza o valor (str/float → int) via normalizar_valor_atributo.
+      2) Chama o classificador de rótulos (classificar_por_tipo).
+    Retorna apenas o label classificado (ex.: 'Bom', 'Médio', 'Alto').
+    """
     if pd.isna(valor) or valor is None:
         return None
-    try:
-        v = int(float(str(valor).replace(',', '.')))
-    except (ValueError, TypeError):
+
+    valor_norm = normalizar_valor_atributo(valor)
+
+    # Se a normalização falhou (ex.: string não numérica), não classifica
+    if valor_norm is None or (isinstance(valor_norm, float) and pd.isna(valor_norm)):
         return None
-    return classificar_por_tipo(v, tipo)
+
+    return classificar_por_tipo(valor_norm, tipo)
 
 
 # ============================================================================

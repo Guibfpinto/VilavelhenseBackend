@@ -286,6 +286,31 @@ def get_value(data, path):
     return cur
 
 
+def normalizar_valor_atributo(valor):
+    """
+    Apenas converte para número INTEIRO (sem divisão, sem corte).
+    O CSV já tem valores na escala 0-20.
+    Retorna o valor original caso não seja numérico.
+    """
+    if valor is None:
+        return None
+    try:
+        return int(float(str(valor).replace(',', '.')))
+    except (ValueError, TypeError):
+        return valor
+
+
+def _is_nan(valor) -> bool:
+    """Verifica NaN/None sem depender do pandas."""
+    if valor is None:
+        return True
+    # NaN é o único valor que é diferente de si mesmo
+    try:
+        return valor != valor
+    except Exception:
+        return False
+
+
 # ===========================================================================
 #  Classificadores (número → label)
 # ===========================================================================
@@ -356,13 +381,27 @@ CLASSIFICADORES = {
 # ===========================================================================
 
 def classificar_por_tipo(valor, tipo):
-    """Aplica o classificador correto com base no tipo."""
-    if valor is None or (isinstance(valor, float) and str(valor) == 'nan'):
+    """
+    Aplica o classificador correto com base no tipo.
+    Pressupõe que o valor já está normalizado (int).
+    """
+    if _is_nan(valor):
         return None
     classificador = CLASSIFICADORES.get(tipo)
     if classificador:
         return classificador(valor)
     return None
+
+
+def classificar_valor(valor, tipo):
+    """
+    Normaliza o valor e devolve o rótulo (label) classificado.
+    Fluxo: normalizar_valor_atributo → classificar_por_tipo.
+    """
+    valor_norm = normalizar_valor_atributo(valor)
+    if _is_nan(valor_norm):
+        return None
+    return classificar_por_tipo(valor_norm, tipo)
 
 
 def extrair_atributos_do_json(json_data):
@@ -385,7 +424,7 @@ def extrair_atributos_comissao(row):
         chave_csv = path[0]  # FIELDS_COMISSAO usa apenas 1 nível
         if chave_csv in row:
             valor = row[chave_csv]
-            if valor is not None and not (isinstance(valor, float) and str(valor) == 'nan'):
+            if not _is_nan(valor):
                 resultado[coluna_ptbr] = valor
     return resultado
 
@@ -400,19 +439,20 @@ def extrair_atributos_diretoria(row):
         chave_csv = path[0]
         if chave_csv in row:
             valor = row[chave_csv]
-            if valor is not None and not (isinstance(valor, float) and str(valor) == 'nan'):
+            if not _is_nan(valor):
                 resultado[coluna_ptbr] = valor
     return resultado
 
 
 def classificar_atributo(valor, tipo):
-    """Aplica o classificador correto com base no tipo."""
-    if valor is None:
+    """
+    Normaliza o valor e retorna (valor_normalizado, label).
+    """
+    valor_norm = normalizar_valor_atributo(valor)
+    if _is_nan(valor_norm):
         return None, None
-    classificador = CLASSIFICADORES.get(tipo)
-    if classificador:
-        return valor, classificador(valor)
-    return valor, None
+    label = classificar_por_tipo(valor_norm, tipo)
+    return valor_norm, label
 
 
 def formatar_atributo_com_label(valor, tipo):
