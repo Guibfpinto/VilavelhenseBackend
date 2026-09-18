@@ -3,6 +3,9 @@
 Mapeamento de atributos FM26 → Colunas PT-BR
 E classificadores de valores em labels (Muito Bom, Bom, Médio, etc.)
 
+Classificação RELATIVA à moda da liga Capixabão 2026 para
+atributos de jogadores. Para comissão/diretoria usa escala fixa.
+
 Suporta 3 categorias:
 - Jogadores (FIELDS)
 - Comissão (FIELDS_COMISSAO)
@@ -11,6 +14,73 @@ Suporta 3 categorias:
 
 import unicodedata
 import re
+
+
+# ===========================================================================
+# MODA DA LIGA CAPIXABÃO 2026 (escala 0-20)
+# Chave = nome da coluna CSV (PT-BR) usado em dados.py
+# Atributo ausente → fallback para escala fixa (10 = Médio)
+# ===========================================================================
+MODAS_CAPIXABAO = {
+    # ---- Mental ----
+    'agressividade':          10,
+    'antecipacao':            10,
+    'coragem':                 8,
+    'composicao':              8,   # Composure
+    'concentracao':            9,
+    'decisao':                12,
+    'determinacao':           13,
+    'criatividade':            5,   # Flair
+    'lideranca':               9,
+    'movimentacao_sem_bola':  11,   # OffTheBall
+    'posicionamento':          7,
+    'trabalho_equipe':         8,
+    'visao_jogo':              7,   # Vision
+    'intensidade_trabalho':    8,   # Workrate
+
+    # ---- Físico ----
+    'aceleracao':             13,
+    'agilidade':              13,
+    'equilibrio':              7,
+    'altura_salto':            9,   # Jumping
+    'condicao_fisica_natural':12,
+    'velocidade_maxima':      13,   # Pace
+    'resistencia':            12,   # Stamina
+    'forca_fisica':            5,
+
+    # ---- Oculto ----
+    'consistencia':           12,
+    'jogo_sujo':              11,   # Dirtiness
+    'jogos_importantes':      12,
+    'propensao_lesao':        10,
+    'versatilidade':          12,
+
+    # ---- Técnico ----
+    'escanteios':              6,   # Corners
+    'cruzamentos':            10,   # Crossing
+    'drible':                 11,
+    'finalizacao':             7,
+    'primeiro_controle':      10,   # FirstTouch
+    'cobranca_faltas':         7,   # Freekicks
+    'cabecada':                8,   # Heading
+    'chutes_longe':            7,   # LongShots
+    'arremessos_laterais':     1,   # Longthrows
+    'marcacao':                6,   # Marking
+    'passe':                   9,   # Passing
+    'cobranca_penaltis':       6,   # PenaltyTaking
+    'desarme':                13,   # Tackling
+    'tecnica':                10,
+
+    # ---- Personalidade ----
+    'adaptabilidade':         13,
+    'ambicao':                11,
+    'lealdade':               12,
+    'pressao':                11,
+    'profissionalismo':       11,
+    'esportividade':          11,   # Sportsmanship
+    'temperamento':           12,
+    'controversia':            5,
+}
 
 
 # ===========================================================================
@@ -101,21 +171,17 @@ FIELDS = {
 # MAPEAMENTO COMISSÃO (CSV → coluna PT-BR)
 # ===========================================================================
 FIELDS_COMISSAO = {
-    # CA / PA
     ("ca",): ("ca", "ca_pa"),
     ("pa",): ("pa", "ca_pa"),
 
-    # Reputação
     ("reputacao_mundial",): ("reputacao_mundial", "reputacao"),
     ("reputacao_atual",):   ("reputacao_atual",   "reputacao"),
     ("reputacao_local",):   ("reputacao_local",   "reputacao"),
 
-    # Gerais
     ("qualificacoes_treinador",): ("qualificacoes_treinador", "habilidade"),
     ("jogos_selecao",):           ("jogos_selecao",           "habilidade"),
     ("gols_selecao",):            ("gols_selecao",            "habilidade"),
 
-    # Coaching
     ("coachingattributes_attacking",):            ("coachingattributes_attacking",            "habilidade"),
     ("coachingattributes_defending",):            ("coachingattributes_defending",            "habilidade"),
     ("coachingattributes_fitness",):              ("coachingattributes_fitness",              "habilidade"),
@@ -130,7 +196,6 @@ FIELDS_COMISSAO = {
     ("coachingattributes_versatility",):          ("coachingattributes_versatility",          "habilidade"),
     ("coachingattributes_setpieces",):            ("coachingattributes_setpieces",            "habilidade"),
 
-    # Staff Mental
     ("staffmentalattributes_adaptability",):            ("staffmentalattributes_adaptability",            "habilidade"),
     ("staffmentalattributes_determination",):           ("staffmentalattributes_determination",           "habilidade"),
     ("staffmentalattributes_judgingplayerability",):    ("staffmentalattributes_judgingplayerability",    "habilidade"),
@@ -142,7 +207,6 @@ FIELDS_COMISSAO = {
     ("staffmentalattributes_physiotherapy",):           ("staffmentalattributes_physiotherapy",           "habilidade"),
     ("staffmentalattributes_tacticalknowledge",):       ("staffmentalattributes_tacticalknowledge",       "habilidade"),
 
-    # Táticas
     ("tacticalattributes_attacking",):            ("tacticalattributes_attacking",            "habilidade"),
     ("tacticalattributes_depth",):                ("tacticalattributes_depth",                "habilidade"),
     ("tacticalattributes_directness",):           ("tacticalattributes_directness",           "habilidade"),
@@ -158,21 +222,17 @@ FIELDS_COMISSAO = {
     ("tacticalattributes_useofsubstitutions",):   ("tacticalattributes_useofsubstitutions",   "habilidade"),
     ("tacticalattributes_width",):                ("tacticalattributes_width",                "habilidade"),
 
-    # Não-Táticos
     ("nontacticalattributes_buyingplayers",):        ("nontacticalattributes_buyingplayers",        "habilidade"),
     ("nontacticalattributes_hardnessoftraining",):   ("nontacticalattributes_hardnessoftraining",   "habilidade"),
     ("nontacticalattributes_mindgames",):            ("nontacticalattributes_mindgames",            "habilidade"),
     ("nontacticalattributes_squadrotation",):        ("nontacticalattributes_squadrotation",        "habilidade"),
 
-    # Scouting
     ("scoutingattributes_judgingplayerdata",):    ("scoutingattributes_judgingplayerdata",    "habilidade"),
     ("scoutingattributes_judgingteamdata",):      ("scoutingattributes_judgingteamdata",      "habilidade"),
     ("scoutingattributes_presentingdata",):       ("scoutingattributes_presentingdata",       "habilidade"),
 
-    # Médica
     ("medicalattributes_sportsscience",):  ("medicalattributes_sportsscience", "habilidade"),
 
-    # Personalidade
     ("personalityattributes_adaptability",):   ("personalityattributes_adaptability",   "habilidade"),
     ("personalityattributes_ambition",):       ("personalityattributes_ambition",       "habilidade"),
     ("personalityattributes_loyalty",):        ("personalityattributes_loyalty",        "habilidade"),
@@ -182,7 +242,6 @@ FIELDS_COMISSAO = {
     ("personalityattributes_temperament",):    ("personalityattributes_temperament",    "habilidade"),
     ("personalityattributes_controversy",):    ("personalityattributes_controversy",    "habilidade"),
 
-    # Roles
     ("rolesattributes_assistantmanager",):        ("rolesattributes_assistantmanager",        "habilidade"),
     ("rolesattributes_coach",):                   ("rolesattributes_coach",                   "habilidade"),
     ("rolesattributes_fitnesscoach",):            ("rolesattributes_fitnesscoach",            "habilidade"),
@@ -205,28 +264,23 @@ FIELDS_COMISSAO = {
 # MAPEAMENTO DIRETORIA (CSV → coluna PT-BR)
 # ===========================================================================
 FIELDS_DIRETORIA = {
-    # CA / PA
     ("ca_diretoria",): ("ca_diretoria", "ca_pa"),
     ("pa_diretoria",): ("pa_diretoria", "ca_pa"),
 
-    # Reputação
     ("reputacao_mundial",): ("reputacao_mundial", "reputacao"),
     ("reputacao_atual",):   ("reputacao_atual",   "reputacao"),
     ("reputacao_local",):   ("reputacao_local",   "reputacao"),
 
-    # Presidência
     ("habilidade_negocios",):   ("habilidade_negocios",   "habilidade"),
     ("interferencia",):         ("interferencia",         "habilidade"),
     ("paciencia_diretoria",):   ("paciencia_diretoria",   "habilidade"),
     ("recursos_financeiros",):  ("recursos_financeiros",  "habilidade"),
 
-    # Não-Táticos
     ("compra_jogadores",):    ("compra_jogadores",    "habilidade"),
     ("intensidade_treino",):  ("intensidade_treino",  "habilidade"),
     ("jogos_mentais",):       ("jogos_mentais",       "habilidade"),
     ("rotacao_elenco",):      ("rotacao_elenco",      "habilidade"),
 
-    # Staff Mental
     ("adaptabilidade",):         ("adaptabilidade",         "habilidade"),
     ("determinacao",):           ("determinacao",           "habilidade"),
     ("julgamento_jogador",):     ("julgamento_jogador",     "habilidade"),
@@ -237,19 +291,16 @@ FIELDS_DIRETORIA = {
     ("motivacao",):              ("motivacao",              "habilidade"),
     ("conhecimento_tatico",):    ("conhecimento_tatico",    "habilidade"),
 
-    # Scouting / Análise
     ("analise_dados_jogador",):  ("analise_dados_jogador",  "habilidade"),
     ("analise_dados_time",):     ("analise_dados_time",     "habilidade"),
     ("apresentacao_dados",):     ("apresentacao_dados",     "habilidade"),
 
-    # Treinamento
     ("gestao_pessoas",):         ("gestao_pessoas",         "habilidade"),
     ("trabalho_jovens",):        ("trabalho_jovens",        "habilidade"),
     ("bolas_paradas",):          ("bolas_paradas",          "habilidade"),
     ("tolerancia_sujeira",):     ("tolerancia_sujeira",     "habilidade"),
     ("versatilidade",):          ("versatilidade",          "habilidade"),
 
-    # Personalidade
     ("ambicao",):         ("ambicao",         "habilidade"),
     ("lealdade",):        ("lealdade",        "habilidade"),
     ("pressao",):         ("pressao",         "habilidade"),
@@ -304,7 +355,6 @@ def _is_nan(valor) -> bool:
     """Verifica NaN/None sem depender do pandas."""
     if valor is None:
         return True
-    # NaN é o único valor que é diferente de si mesmo
     try:
         return valor != valor
     except Exception:
@@ -341,12 +391,34 @@ def classificar_perna(v):
     return "Muito Forte"
 
 
-def classificar_habilidade(v):
-    """Atributos de habilidade — escala 0-20."""
+def classificar_habilidade(v, attr=None):
+    """
+    Atributos de habilidade — escala 0-20.
+
+    Se `attr` for fornecido e estiver em MODAS_CAPIXABAO:
+      → classifica RELATIVO à moda da liga Capixabão 2026
+        (diferença contra a moda define o label)
+
+    Caso contrário:
+      → usa escala fixa (10 = Médio)
+    """
     try:
         v = int(v)
     except (TypeError, ValueError):
         return None
+
+    # ---- Modo relativo à liga ----
+    mode = MODAS_CAPIXABAO.get(attr) if attr else None
+
+    if mode is not None:
+        diff = v - mode
+        if diff <= -5:  return "Muito Ruim"
+        if diff <= -2:  return "Ruim"
+        if diff <= 1:   return "Médio"
+        if diff <= 4:   return "Bom"
+        return "Muito Bom"
+
+    # ---- Fallback: escala fixa 0-20 ----
     if v <= 4:   return "Muito Ruim"
     if v <= 8:   return "Ruim"
     if v <= 12:  return "Médio"
@@ -369,10 +441,11 @@ def classificar_reputacao(v):
 
 
 CLASSIFICADORES = {
-    "ca_pa":       classificar_ca_pa,
-    "perna":       classificar_perna,
-    "habilidade":  classificar_habilidade,
-    "reputacao":   classificar_reputacao,
+    "ca_pa":      classificar_ca_pa,
+    "perna":      classificar_perna,
+    "reputacao":  classificar_reputacao,
+    # "habilidade" é tratada separadamente em classificar_por_tipo
+    # porque aceita o parâmetro opcional `attr`.
 }
 
 
@@ -380,28 +453,33 @@ CLASSIFICADORES = {
 #  Funções públicas
 # ===========================================================================
 
-def classificar_por_tipo(valor, tipo):
+def classificar_por_tipo(valor, tipo, attr=None):
     """
     Aplica o classificador correto com base no tipo.
-    Pressupõe que o valor já está normalizado (int).
+    `attr` (opcional) é o nome da coluna CSV — usado para classificar
+    'habilidade' relativo à moda da liga.
     """
     if _is_nan(valor):
         return None
+
+    if tipo == "habilidade":
+        return classificar_habilidade(valor, attr=attr)
+
     classificador = CLASSIFICADORES.get(tipo)
     if classificador:
         return classificador(valor)
     return None
 
 
-def classificar_valor(valor, tipo):
+def classificar_valor(valor, tipo, attr=None):
     """
-    Normaliza o valor e devolve o rótulo (label) classificado.
+    Normaliza o valor e devolve o rótulo classificado.
     Fluxo: normalizar_valor_atributo → classificar_por_tipo.
     """
     valor_norm = normalizar_valor_atributo(valor)
     if _is_nan(valor_norm):
         return None
-    return classificar_por_tipo(valor_norm, tipo)
+    return classificar_por_tipo(valor_norm, tipo, attr=attr)
 
 
 def extrair_atributos_do_json(json_data):
@@ -415,13 +493,9 @@ def extrair_atributos_do_json(json_data):
 
 
 def extrair_atributos_comissao(row):
-    """
-    Extrai atributos da comissão a partir de uma linha (dict ou Series).
-    Retorna {coluna_ptbr: valor}.
-    """
     resultado = {}
     for path, (coluna_ptbr, tipo) in FIELDS_COMISSAO.items():
-        chave_csv = path[0]  # FIELDS_COMISSAO usa apenas 1 nível
+        chave_csv = path[0]
         if chave_csv in row:
             valor = row[chave_csv]
             if not _is_nan(valor):
@@ -430,10 +504,6 @@ def extrair_atributos_comissao(row):
 
 
 def extrair_atributos_diretoria(row):
-    """
-    Extrai atributos da diretoria a partir de uma linha (dict ou Series).
-    Retorna {coluna_ptbr: valor}.
-    """
     resultado = {}
     for path, (coluna_ptbr, tipo) in FIELDS_DIRETORIA.items():
         chave_csv = path[0]
@@ -444,20 +514,18 @@ def extrair_atributos_diretoria(row):
     return resultado
 
 
-def classificar_atributo(valor, tipo):
-    """
-    Normaliza o valor e retorna (valor_normalizado, label).
-    """
+def classificar_atributo(valor, tipo, attr=None):
+    """Normaliza o valor e retorna (valor_normalizado, label)."""
     valor_norm = normalizar_valor_atributo(valor)
     if _is_nan(valor_norm):
         return None, None
-    label = classificar_por_tipo(valor_norm, tipo)
+    label = classificar_por_tipo(valor_norm, tipo, attr=attr)
     return valor_norm, label
 
 
-def formatar_atributo_com_label(valor, tipo):
+def formatar_atributo_com_label(valor, tipo, attr=None):
     """Retorna string no formato 'valor (label)'."""
-    v, label = classificar_atributo(valor, tipo)
+    v, label = classificar_atributo(valor, tipo, attr=attr)
     if v is None:
         return "N/I"
     if label:
@@ -467,4 +535,4 @@ def formatar_atributo_com_label(valor, tipo):
 
 def listar_tipos_disponiveis():
     """Retorna os tipos de classificação disponíveis."""
-    return list(CLASSIFICADORES.keys())
+    return list(CLASSIFICADORES.keys()) + ["habilidade"]

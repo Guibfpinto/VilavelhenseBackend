@@ -1,5 +1,6 @@
 # services/dados.py - Classificação via atributos_mapper
 # IMC numérico + bioimpedância (CSV) + Faulkner / Pollock / Lee (fallback)
+# Atributos de jogador classificados relativo à moda do Capixabão 2026
 
 import os
 import pandas as pd
@@ -97,12 +98,14 @@ def safe_divide(numerador, denominador):
     return numerador / denominador
 
 
-def classificar(valor, tipo):
+def classificar(valor, tipo, attr=None):
     """
     Wrapper seguro:
       1) Normaliza o valor (str/float → int) via normalizar_valor_atributo.
       2) Chama o classificador de rótulos (classificar_por_tipo).
-    Retorna apenas o label classificado (ex.: 'Bom', 'Médio', 'Alto').
+    `attr` (opcional) é o nome da coluna CSV — necessário para classificar
+    'habilidade' relativo à moda da liga Capixabão 2026.
+    Retorna apenas o label (ex.: 'Bom', 'Médio', 'Alto').
     """
     if pd.isna(valor) or valor is None:
         return None
@@ -112,7 +115,7 @@ def classificar(valor, tipo):
     if valor_norm is None or (isinstance(valor_norm, float) and pd.isna(valor_norm)):
         return None
 
-    return classificar_por_tipo(valor_norm, tipo)
+    return classificar_por_tipo(valor_norm, tipo, attr=attr)
 
 
 # ============================================================================
@@ -638,7 +641,10 @@ def carregar_dados_diretoria(categoria='diretoria'):
 # ============================================================================
 
 def agrupar_atributos_jogador(row):
-    """Agrupa atributos do jogador retornando APENAS a classificação."""
+    """
+    Agrupa atributos do jogador retornando APENAS a classificação.
+    Passa `attr=a` para permitir classificação relativa à moda do Capixabão.
+    """
     atributos = {}
 
     tecnicos = [
@@ -647,7 +653,7 @@ def agrupar_atributos_jogador(row):
         'marcacao', 'passe', 'cobranca_penaltis', 'desarme', 'tecnica',
     ]
     atributos['tecnicos'] = {
-        a: classificar(row.get(a), "habilidade") for a in tecnicos
+        a: classificar(row.get(a), "habilidade", attr=a) for a in tecnicos
         if a in row and pd.notna(row.get(a))
     }
 
@@ -658,7 +664,7 @@ def agrupar_atributos_jogador(row):
         'visao_jogo', 'intensidade_trabalho',
     ]
     atributos['mentais'] = {
-        a: classificar(row.get(a), "habilidade") for a in mentais
+        a: classificar(row.get(a), "habilidade", attr=a) for a in mentais
         if a in row and pd.notna(row.get(a))
     }
 
@@ -668,7 +674,7 @@ def agrupar_atributos_jogador(row):
         'forca_fisica',
     ]
     atributos['fisicos'] = {
-        a: classificar(row.get(a), "habilidade") for a in fisicos
+        a: classificar(row.get(a), "habilidade", attr=a) for a in fisicos
         if a in row and pd.notna(row.get(a))
     }
 
@@ -677,8 +683,9 @@ def agrupar_atributos_jogador(row):
         'comunicacao_goleiro', 'chutes_goleiro', 'um_contra_um_goleiro',
         'saida_gol', 'tendencia_socar', 'arremessos_goleiro', 'excentricidade',
     ]
+    # Goleiro não tem moda específica → cai no fallback da escala fixa
     atributos['goleiro'] = {
-        a: classificar(row.get(a), "habilidade") for a in goleiro
+        a: classificar(row.get(a), "habilidade", attr=a) for a in goleiro
         if a in row and pd.notna(row.get(a))
     }
 
@@ -687,7 +694,7 @@ def agrupar_atributos_jogador(row):
         'propensao_lesao', 'versatilidade',
     ]
     atributos['ocultos'] = {
-        a: classificar(row.get(a), "habilidade") for a in ocultos
+        a: classificar(row.get(a), "habilidade", attr=a) for a in ocultos
         if a in row and pd.notna(row.get(a))
     }
 
@@ -696,7 +703,7 @@ def agrupar_atributos_jogador(row):
         'profissionalismo', 'esportividade', 'temperamento', 'controversia',
     ]
     atributos['personalidade'] = {
-        a: classificar(row.get(a), "habilidade") for a in personalidade
+        a: classificar(row.get(a), "habilidade", attr=a) for a in personalidade
         if a in row and pd.notna(row.get(a))
     }
 
@@ -708,8 +715,9 @@ def agrupar_atributos_jogador(row):
 # ============================================================================
 
 def agrupar_atributos_comissao(row):
-    """Agrupa atributos da comissão retornando APENAS a classificação.
-    CA/PA → ca_pa | Reputação → reputacao | Outros → habilidade
+    """
+    Agrupa atributos da comissão retornando APENAS a classificação.
+    CA/PA → ca_pa | Reputação → reputacao | Outros → habilidade (escala fixa)
     """
     atributos = {}
 
@@ -721,7 +729,6 @@ def agrupar_atributos_comissao(row):
     if 'pa' in row and pd.notna(row.get('pa')):
         atributos['gerais']['PA'] = classificar(row.get('pa'), "ca_pa")
 
-    # Reputação
     if 'reputacao_mundial' in row and pd.notna(row.get('reputacao_mundial')):
         atributos['gerais']['Reputação Mundial'] = classificar(
             row.get('reputacao_mundial'), "reputacao"
@@ -735,7 +742,6 @@ def agrupar_atributos_comissao(row):
             row.get('reputacao_local'), "reputacao"
         )
 
-    # Outros gerais
     outros_gerais = ['qualificacoes_treinador', 'jogos_selecao', 'gols_selecao']
     for a in outros_gerais:
         if a in row and pd.notna(row.get(a)):
@@ -861,8 +867,9 @@ def agrupar_atributos_comissao(row):
 # ============================================================================
 
 def agrupar_atributos_diretoria(row):
-    """Agrupa atributos da diretoria retornando APENAS a classificação.
-    CA/PA → ca_pa | Reputação → reputacao | Outros → habilidade
+    """
+    Agrupa atributos da diretoria retornando APENAS a classificação.
+    CA/PA → ca_pa | Reputação → reputacao | Outros → habilidade (escala fixa)
     """
     atributos = {}
 
@@ -874,7 +881,6 @@ def agrupar_atributos_diretoria(row):
     if 'pa_diretoria' in row and pd.notna(row.get('pa_diretoria')):
         atributos['gerais']['PA'] = classificar(row.get('pa_diretoria'), "ca_pa")
 
-    # Reputação
     if 'reputacao_mundial' in row and pd.notna(row.get('reputacao_mundial')):
         atributos['gerais']['Reputação Mundial'] = classificar(
             row.get('reputacao_mundial'), "reputacao"
