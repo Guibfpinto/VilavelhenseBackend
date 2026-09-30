@@ -1,5 +1,12 @@
 nome_completo;apelido;data_nascimento;posicao;pe_pref;altura_cm;peso_kg;raca;sexo;dobra_triceps;dobra_subescapular;dobra_suprailiaca;dobra_abdominal;dobra_coxa;dobra_panturilha;perimetro_braco;perimetro_coxa;perimetro_perna;dobra_peitoral;dobra_axiliar_media;cidade_nascimento;uf_nascimento;pais_nascimento;ogol_id;data_bioimpedancia
-Lucas Jorge Pacheco Ferreira;Lucão;1997-09-25;Goleiro;D;199;96.0;;Masculino;;;;;;;;;;;;Três Rios;RJ;BRA;662435;
-Jeferson David Palacios Cantillo;Jeferson Palacios;2000-01-03;Zagueiro;D;187;90.0;;Masculino;;;;;;;;;;;;Rioacha;La Guajira;COL;787886;
+Lucas Jorge Pacheco Ferreira;Lucão; 1997-09-25;Goleiro;D;199;96.0;;Masculino;;;;;;;;;;;;Três Rios;RJ;BRA;662435;
+Jeferson David Palacios Cantillo;Jeferson Palacios; 2000-01-03;Zagueiro;D;187;90.0;;Masculino;;;;;;;;;;;;Rioacha;La Guajira;COL;787886;
+Gabriel Amorim de Aguiar;Gabriel Amorim; 2004-07-27;Volante / Zagueiro / Lateral Direito;D;;;;Masculino;;;;;;;;;;;;Serra;ES;BRA;1542489;
 João Victor Rozário da Rocha;João Rozário;2003-02-23;Meia-Central / Lateral Esquerdo;C;180;72.0;;Masculino;;;;;;;;;;;;Cariacica;ES;BRA;902427;
+João Pedro Firmino Oliveira;João Firmino;2001-11-09;Volante / Lateral Direito;D;175;74.0;;Masculino;;;;;;;;;;;;Cariacica;ES;BRA;649473;
 Virgílio Santos Borges;Borjão;1996-06-11;Volante;D;186;76.0;;Masculino;;;;;;;;;;;;Salvador;BA;BRA;481421;
+Jarles Pereira de Santana;Jarles Baiano;1996-03-16;Centroavante;D;176;90.0;;Masculino;;;;;;;;;;;;;Itabela;BA;BRA;450048;
+Marcelo Breno de Jesus Costa;Marcelo Costa;2008-01-16;Zagueiro;;;;;Masculino;;;;;;;;;;;;;;;BRA;1521964;
+Hugo Lima Neves;Hugo;2008-06-03;Zagueiro;;;;;Masculino;;;;;;;;;;;;;;BRA;3515123;
+Roberto Mário Durango Pacheco;Roberto Durango;2004-03-09;Meia-Central;D;178;74.0;;Masculino;;;;;;;;;;;;Cerete;Cordoba;COL;3547576;
+Henrique da Conceição dos Santos;Henrique;2001-08-20;Meia;D;;;;Masculino;;;;;;;;;;;;;;BRA;767035;
