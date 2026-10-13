@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-VILAVELHENSE FC - BACKEND API
-Flask + Proxy para FastAPI + Tailscale Funnel
+VILAVELHENSE FC - BACKEND API PRINCIPAL
+Flask + Proxy para FastAPI (Ecossistema Unificado Desktop & Mobile)
 """
 from flask import Flask, jsonify, request, Response, send_from_directory, abort
 from flask_cors import CORS
@@ -10,7 +10,7 @@ from config import Config
 import os
 import requests as http_requests
 
-# ========== IMPORTAÇÃO DOS BLUEPRINTS ==========
+# ========== IMPORTAÇÃO DOS BLUEPRINTS ORIGINAIS ==========
 from routes import (
     auth,
     jogadores,
@@ -54,31 +54,19 @@ app.register_blueprint(relatorios.bp)
 @app.route('/')
 def home():
     return jsonify({
-        'nome': 'Vilavelhense FC API',
-        'versao': '2.3',  # ← subi a versão (nova composição corporal)
+        'nome': 'Vilavelhense FC API - Ecossistema Unificado',
+        'versao': '2.5',
         'status': 'online',
-        'endpoints': {
+        'endpoints_principais': {
             'auth': '/api/auth/login',
             'jogadores': '/api/jogadores/<categoria>',
-            'jogadores_buscar': '/api/jogadores/<categoria>/buscar?q=...',
-            'jogadores_detalhe': '/api/jogadores/<categoria>/detalhe/<nome>',
             'comissao': '/api/comissao/<categoria>',
             'diretoria': '/api/diretoria/',
             'cartoes': '/api/cartoes/<categoria>',
-            'partida_montar': '/api/partida/montar',
-            'estatisticas_relatorio': '/api/estatisticas/<categoria>/relatorio',
-            'estatisticas_posicao': '/api/estatisticas/<categoria>/posicao',
-            'estatisticas_condicao': '/api/estatisticas/<categoria>/condicao',
-            'proximo_jogo': '/api/proximo_jogo',
-            'gps': '/api/gps/<int:atleta_id>',
-            'jogos': '/api/jogos/<int:atleta_id>',
-            'treinos': '/api/treinos/<int:atleta_id>',
-            'wellbeing': '/api/wellbeing/<int:atleta_id>',
-            'relatorios_diretoria': '/api/relatorios/diretoria',
-            'relatorios_jogador': '/api/relatorios/jogador/<int:ogol_id>',
-            'relatorios_comissao': '/api/relatorios/comissao/<int:membro_id>',
-            'relatorios_comissao_completo': '/api/relatorios/comissao/completo',
-            'relatorios_wellbeing': '/api/relatorios/wellbeing/<int:atleta_id>',
+            'pwa_ecossistema': '/fastapi/api/ecossistema/pwa/registo-atleta',
+            'rtp_ecossistema': '/fastapi/api/ecossistema/fisioterapia/rtp/<atleta_id>',
+            'scout_adversario': '/fastapi/api/ecossistema/analista/scout-adversario',
+            'dashboard_executivo': '/fastapi/api/ecossistema/direcao/dashboard-executivo',
             'health': '/api/health',
             'fastapi_proxy': '/fastapi/<path>',
         }
@@ -90,18 +78,17 @@ def home():
 # ============================================================
 @app.route('/api/health')
 def health():
-    """Rota de health check para o app verificar se o servidor está ativo."""
-    return jsonify({'status': 'ok'})
+    """Rota de health check para o app e ambiente móvel verificarem se o servidor está ativo."""
+    return jsonify({'status': 'ok', 'servidor': 'online'})
 
 
 # ============================================================
-# PROXY PARA FASTAPI (para funcionar através do Funnel)
+# PROXY PARA FASTAPI (Integração Mobile & Desktop via Funnel/Ngrok)
 # ============================================================
 @app.route('/fastapi/<path:caminho>', methods=['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'])
 def proxy_fastapi(caminho):
     """
-    Encaminha requisições para a FastAPI (localhost:8000).
-    Permite que o app acesse a FastAPI através do mesmo túnel do Flask (Funnel/ngrok).
+    Encaminha requisições da aplicação móvel ou desktop para a FastAPI (localhost:8000).
     """
     try:
         url = f"http://localhost:8000/{caminho}"
@@ -148,11 +135,11 @@ def proxy_fastapi(caminho):
 
 
 # ============================================================
-# ROTA PARA FOTOS
+# ROTA PARA FOTOS E ASSETS
 # ============================================================
 @app.route('/fotos/<categoria>/<path:filename>')
 def serve_foto(categoria, filename):
-    """Serve fotos de jogadores, comissão e diretoria."""
+    """Serve fotos de jogadores, comissão, diretoria e assets gráficos."""
     mapa_pastas = {
         'profissional': 'Jogadores/Profissional',
         'sub20': 'Jogadores/Sub20',
@@ -176,7 +163,7 @@ def serve_foto(categoria, filename):
 
 
 # ============================================================
-# HANDLERS
+# HANDLERS DE ERRO
 # ============================================================
 @app.errorhandler(404)
 def not_found(error):
@@ -196,25 +183,22 @@ def internal_error(error):
 
 
 # ============================================================
-# EXECUÇÃO
+# EXECUÇÃO DO SERVIDOR FLASK
 # ============================================================
 if __name__ == '__main__':
     from services.auth_service import carregar_usuarios
     carregar_usuarios()
 
     print("=" * 60)
-    print("VILAVELHENSE FC - BACKEND API")
+    print("VILAVELHENSE FC - BACKEND API PRINCIPAL (FLASK)")
     print(f"Servidor rodando em http://{Config.HOST}:{Config.PORT}")
     print(f"Pasta de dados: {Config.DATA_FOLDER}")
     print("=" * 60)
-    print("Rotas disponíveis:")
-    print("  GET  /                     → info da API")
-    print("  GET  /api/health           → health check")
-    print("  GET  /api/jogadores/<cat>  → lista de jogadores")
-    print("  GET  /api/comissao/<cat>   → lista da comissão")
-    print("  GET  /api/diretoria/       → lista da diretoria")
-    print("  GET  /fotos/<cat>/<file>   → fotos")
-    print("  ALL  /fastapi/<path>       → proxy para FastAPI (porta 8000)")
+    print("Principais Rotas:")
+    print("  GET  /                     → Informações do ecossistema")
+    print("  GET  /api/health           → Health check")
+    print("  GET  /fotos/<cat>/<file>   → Servidor de imagens")
+    print("  ALL  /fastapi/<path>       → Proxy inteligente para FastAPI (porta 8000)")
     print("=" * 60)
 
     app.run(host=Config.HOST, port=Config.PORT, debug=Config.DEBUG)

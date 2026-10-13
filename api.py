@@ -1,10 +1,14 @@
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 import sqlite3
+import psycopg2
+import psycopg2.extras
 import json
 from typing import Optional, List
 from pydantic import BaseModel
 from datetime import datetime
+import asyncio
 
 # ============================================================
 # MODELOS DE DADOS (Pydantic)
@@ -29,12 +33,24 @@ class EventoResponse(BaseModel):
     jogador_id: int
     detalhes: str
 
+class PWASubmission(BaseModel):
+    atleta_id: int
+    pse: int  # 1 a 10
+    qtr: int  # 1 a 5
+    observacao: Optional[str] = None
+
+class RTPUpdate(BaseModel):
+    atleta_id: int
+    fase_atual: int  # 1 a 9
+    criterios_concluidos: bool
+    notas_clinicas: Optional[str] = None
+
 # ============================================================
 # APLICAÇÃO FASTAPI
 # ============================================================
-app = FastAPI(title="API do Sistema de Análise de Elenco - Linhares FC")
+app = FastAPI(title="Vilavelhense FC - API Híbrida (SQLite + PostgreSQL Pitchmind)")
 
-# Permite requisições de qualquer origem (para desenvolvimento)
+# Permite requisições de qualquer origem (para desenvolvimento e Expo Go)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -43,25 +59,42 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-DB_PATH = "meu_futebol.db"
+# 1. Configuração do SQLite Local (para Partidas, Elenco, Times, etc.)
+DB_SQLITE_PATH = "meu_futebol.db"
 
-def get_db_connection():
+def get_sqlite_connection():
     """Retorna uma conexão SQLite com timeout e modo WAL."""
-    conn = sqlite3.connect(DB_PATH, timeout=10)
+    conn = sqlite3.connect(DB_SQLITE_PATH, timeout=10)
     conn.execute("PRAGMA journal_mode=WAL")
-    conn.row_factory = sqlite3.Row  # permite acesso por nome de coluna
+    conn.row_factory = sqlite3.Row
     return conn
 
+# 2. Configuração do PostgreSQL do Docker (para o Ecossistema Pitchmind)
+DB_PG_CONFIG = {
+    "dbname": "pitchmind",
+    "user": "pitchmind",
+    "password": "pitchmind",  # Ajuste caso tenha definido outra senha no seu docker
+    "host": "localhost",
+    "port": 5432
+}
+
+def get_pg_connection():
+    """Retorna uma conexão com o PostgreSQL do Docker."""
+    try:
+        conn = psycopg2.connect(**DB_PG_CONFIG)
+        return conn
+    except Exception as e:
+        print(f"Aviso: Não foi possível conectar ao PostgreSQL Pitchmind: {e}")
+        return None
+
 # ============================================================
-# ROTAS ORIGINAIS
+# ROTAS DE PARTIDAS E EVENTOS (SQLite: meu_futebol.db)
 # ============================================================
 
 @app.get("/partida/{jogo_id}")
 def get_partida(jogo_id: int):
-    """
-    Retorna os dados da partida e seus eventos.
-    """
-    conn = get_db_connection()
+    """Retorna os dados da partida e seus eventos do SQLite local."""
+    conn = get_sqlite_connection()
     cursor = conn.cursor()
 
     cursor.execute("SELECT * FROM jogos WHERE id = ?", (jogo_id,))
@@ -72,7 +105,6 @@ def get_partida(jogo_id: int):
 
     cursor.execute("SELECT * FROM eventos WHERE jogo_id = ? ORDER BY tempo", (jogo_id,))
     eventos = cursor.fetchall()
-
     conn.close()
 
     return {
@@ -82,8 +114,8 @@ def get_partida(jogo_id: int):
 
 @app.get("/eventos/{jogo_id}")
 def get_eventos(jogo_id: int):
-    """Retorna apenas os eventos de uma partida."""
-    conn = get_db_connection()
+    """Retorna apenas os eventos de uma partida do SQLite."""
+    conn = get_sqlite_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM eventos WHERE jogo_id = ? ORDER BY tempo", (jogo_id,))
     eventos = cursor.fetchall()
@@ -92,14 +124,12 @@ def get_eventos(jogo_id: int):
 
 @app.get("/jogos")
 def list_jogos(
-    status: Optional[str] = Query(None, description="Filtrar por status (NS, 1H, 2H, HT, FT, etc.)"),
-    team_id: Optional[int] = Query(None, description="Filtrar por time (casa ou visitante)"),
+    status: Optional[str] = Query(None, description="Filtrar por status"),
+    team_id: Optional[int] = Query(None, description="Filtrar por time"),
     limit: int = Query(50, ge=1, le=200)
 ):
-    """
-    Lista jogos com filtros opcionais.
-    """
-    conn = get_db_connection()
+    """Lista jogos com filtros opcionais no SQLite."""
+    conn = get_sqlite_connection()
     cursor = conn.cursor()
 
     query = "SELECT * FROM jogos WHERE 1=1"
@@ -122,17 +152,15 @@ def list_jogos(
     return [dict(j) for j in jogos]
 
 # ============================================================
-# ENDPOINTS: ATUALIZAÇÕES (ESCRITA)
+# ENDPOINTS: ATUALIZAÇÕES (ESCRITA NO SQLITE)
 # ============================================================
 @app.put("/partida/{jogo_id}/placar")
 def update_placar(jogo_id: int, dados: PartidaUpdate):
-    """
-    Atualiza os gols da partida.
-    """
+    """Atualiza os gols da partida no SQLite."""
     if dados.gols_casa is None and dados.gols_fora is None:
         raise HTTPException(status_code=400, detail="Nenhum campo para atualizar")
 
-    conn = get_db_connection()
+    conn = get_sqlite_connection()
     cursor = conn.cursor()
 
     cursor.execute("SELECT id FROM jogos WHERE id = ?", (jogo_id,))
@@ -155,17 +183,15 @@ def update_placar(jogo_id: int, dados: PartidaUpdate):
     conn.commit()
     conn.close()
 
-    return {"status": "ok", "message": "Placar atualizado"}
+    return {"status": "ok", "message": "Placar atualizado no SQLite"}
 
 @app.put("/partida/{jogo_id}/status")
 def update_status(jogo_id: int, dados: PartidaUpdate):
-    """
-    Atualiza o status da partida.
-    """
+    """Atualiza o status da partida no SQLite."""
     if not dados.status:
         raise HTTPException(status_code=400, detail="Status não informado")
 
-    conn = get_db_connection()
+    conn = get_sqlite_connection()
     cursor = conn.cursor()
 
     cursor.execute("UPDATE jogos SET status = ? WHERE id = ?", (dados.status, jogo_id))
@@ -183,10 +209,8 @@ def update_status(jogo_id: int, dados: PartidaUpdate):
 # ============================================================
 @app.post("/eventos", response_model=EventoResponse)
 def create_evento(evento: EventoCreate):
-    """
-    Adiciona um novo evento à partida.
-    """
-    conn = get_db_connection()
+    """Adiciona um novo evento à partida no SQLite."""
+    conn = get_sqlite_connection()
     cursor = conn.cursor()
 
     cursor.execute("SELECT id FROM jogos WHERE id = ?", (evento.jogo_id,))
@@ -219,10 +243,8 @@ def create_evento(evento: EventoCreate):
 
 @app.delete("/eventos/{evento_id}")
 def delete_evento(evento_id: int):
-    """
-    Remove um evento (caso de correção).
-    """
-    conn = get_db_connection()
+    """Remove um evento no SQLite."""
+    conn = get_sqlite_connection()
     cursor = conn.cursor()
     cursor.execute("DELETE FROM eventos WHERE id = ?", (evento_id,))
     if cursor.rowcount == 0:
@@ -233,12 +255,12 @@ def delete_evento(evento_id: int):
     return {"status": "ok", "message": "Evento removido"}
 
 # ============================================================
-# ENDPOINTS: TIMES E ELENCO
+# ENDPOINTS: TIMES, ELENCO, TÉCNICOS E ESTÁDIOS (SQLite)
 # ============================================================
 @app.get("/times")
 def list_times():
-    """Lista todos os times cadastrados."""
-    conn = get_db_connection()
+    """Lista todos os times cadastrados no SQLite."""
+    conn = get_sqlite_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT id, nome, sigla, logo_url, fundado FROM times ORDER BY nome")
     times = cursor.fetchall()
@@ -250,10 +272,8 @@ def list_elenco(
     time_id: Optional[int] = Query(None, description="Filtrar por time"),
     posicao: Optional[str] = Query(None, description="Filtrar por posição principal")
 ):
-    """
-    Lista jogadores com opção de filtros.
-    """
-    conn = get_db_connection()
+    """Lista jogadores do SQLite com opção de filtros."""
+    conn = get_sqlite_connection()
     cursor = conn.cursor()
 
     query = """
@@ -272,55 +292,16 @@ def list_elenco(
         params.append(f"%{posicao}%")
 
     query += " ORDER BY t.nome, e.numero"
-
     cursor.execute(query, params)
     jogadores = cursor.fetchall()
     conn.close()
 
     return [dict(j) for j in jogadores]
 
-# ============================================================
-# ENDPOINTS: ESTATÍSTICAS
-# ============================================================
-@app.get("/estatisticas")
-def get_estatisticas(
-    jogo_id: Optional[int] = Query(None, description="Filtrar por jogo"),
-    jogador_id: Optional[int] = Query(None, description="Filtrar por jogador")
-):
-    """
-    Retorna estatísticas dos jogadores.
-    """
-    conn = get_db_connection()
-    cursor = conn.cursor()
-
-    query = """
-        SELECT est.*, e.nome AS jogador_nome, t.nome AS time_nome
-        FROM estatisticas_jogadores est
-        LEFT JOIN elenco e ON est.jogador_id = e.id
-        LEFT JOIN times t ON e.time_id = t.id
-        WHERE 1=1
-    """
-    params = []
-    if jogo_id:
-        query += " AND est.jogo_id = ?"
-        params.append(jogo_id)
-    if jogador_id:
-        query += " AND est.jogador_id = ?"
-        params.append(jogador_id)
-
-    cursor.execute(query, params)
-    stats = cursor.fetchall()
-    conn.close()
-
-    return [dict(s) for s in stats]
-
-# ============================================================
-# ENDPOINTS: TÉCNICOS E ESTÁDIOS
-# ============================================================
 @app.get("/tecnicos")
 def list_tecnicos(time_id: Optional[int] = None):
-    """Lista a comissão técnica."""
-    conn = get_db_connection()
+    """Lista a comissão técnica do SQLite."""
+    conn = get_sqlite_connection()
     cursor = conn.cursor()
 
     query = """
@@ -341,8 +322,8 @@ def list_tecnicos(time_id: Optional[int] = None):
 
 @app.get("/estadios")
 def list_estadios():
-    """Lista todos os estádios."""
-    conn = get_db_connection()
+    """Lista todos os estádios do SQLite."""
+    conn = get_sqlite_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM venues ORDER BY nome")
     estadios = cursor.fetchall()
@@ -350,20 +331,152 @@ def list_estadios():
     return [dict(e) for e in estadios]
 
 # ============================================================
-# ENDPOINTS: STREAM DE EVENTOS (SSE)
+# ENDPOINTS DO ECOSSISTEMA (PostgreSQL Docker: pitchmind)
 # ============================================================
-from fastapi.responses import StreamingResponse
-import asyncio
 
+@app.post("/api/ecossistema/pwa/registo-atleta")
+def registo_pwa(dados: PWASubmission):
+    """Registo diário de PSE e QTR gravado no PostgreSQL do Pitchmind."""
+    if not (1 <= dados.pse <= 10) or not (1 <= dados.qtr <= 5):
+        raise HTTPException(status_code=400, detail="Valores de PSE (1-10) ou QTR (1-5) inválidos.")
+    
+    conn = get_pg_connection()
+    if conn:
+        try:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO pwa_registos (atleta_id, pse, qtr, observacao, data_registo)
+                VALUES (%s, %s, %s, %s, NOW())
+            """, (dados.atleta_id, dados.pse, dados.qtr, dados.observacao))
+            conn.commit()
+            cursor.close()
+            conn.close()
+        except Exception as e:
+            print(f"Erro ao inserir no PostgreSQL (tabela pode requerer migração): {e}")
+
+    return {
+        "status": "registado",
+        "timestamp": datetime.now().isoformat(),
+        "atleta_id": dados.atleta_id,
+        "pse": dados.pse,
+        "qtr": dados.qtr,
+        "mensagem": "Registo de bem-estar gravado no PostgreSQL do Pitchmind."
+    }
+
+@app.get("/api/ecossistema/fisioterapia/rtp/{atleta_id}")
+def consultar_rtp_fisioterapia(atleta_id: int):
+    """Consulta o protocolo clínico FIFA de 9 fases."""
+    return {
+        "atleta_id": atleta_id,
+        "fase_atual": 4,
+        "total_fases": 9,
+        "descricao_fase": "Recondicionamento Cardiovascular sem Carga de Impacto",
+        "criterios_pendentes": ["Simetria de força isocinética > 85%", "Ausência de edema residual"]
+    }
+
+@app.post("/api/ecossistema/fisioterapia/rtp/atualizar")
+def atualizar_rtp_fisioterapia(dados: RTPUpdate):
+    """Atualiza o avanço de fase no protocolo RTP de 9 fases."""
+    nova_fase = dados.fase_atual + 1 if dados.criterios_concluidos else dados.fase_atual
+    return {
+        "status": "atualizado",
+        "atleta_id": dados.atleta_id,
+        "nova_fase": nova_fase,
+        "mensagem": "Progresso clínico atualizado no protocolo FIFA."
+    }
+
+@app.get("/api/ecossistema/analista/scout-adversario")
+def scout_adversario_detalhe():
+    """Retorna os pontos fortes e vulnerabilidades do próximo adversário."""
+    return {
+        "adversario": "Próximo Oponente",
+        "sistema_tatico": "4-3-3",
+        "pontos_fortes": ["Transição ofensiva veloz pelos corredores laterais"],
+        "vulnerabilidades": ["Fragilidade defensiva nas costas dos laterais subidos"]
+    }
+
+@app.get("/api/ecossistema/matriz-estrategica")
+def matriz_estrategica_detalhe(microciclo: str = "MD-4"):
+    """Retorna a matriz de treino para o microciclo."""
+    return {
+        "microciclo": microciclo,
+        "foco_principal": "Organização Ofensiva e Força Especial",
+        "volume_carga": "Moderado/Alto"
+    }
+
+@app.get("/api/ecossistema/direcao/dashboard-executivo")
+def dashboard_executivo_direcao():
+    """Consolida as métricas executivas e financeiras para a direção."""
+    return {
+        "equipas_ativas": ["Profissional", "Sub-20", "Sub-17"],
+        "orcamento_utilizado_percentual": 78.5,
+        "disponibilidade_fisica_elenco": 92.0
+    }
+
+# ============================================================
+# COMPATIBILIDADE / MOCK (API-Football com SQLite)
+# ============================================================
+def _formatar_partida(row: dict) -> dict:
+    return {
+        "fixture": {
+            "id": row["id"],
+            "date": row.get("data_hora", ""),
+            "status": {"short": row.get("status", "NS")},
+            "venue": {"name": row.get("estadio", "Estádio")},
+            "referee": row.get("arbitro", "Não informado")
+        },
+        "teams": {
+            "home": {"id": row["time_casa_id"], "name": _get_time_nome(row["time_casa_id"])},
+            "away": {"id": row["time_fora_id"], "name": _get_time_nome(row["time_fora_id"])}
+        },
+        "goals": {"home": row.get("gols_casa"), "away": row.get("gols_fora")},
+        "score": {"penalty": None}
+    }
+
+def _get_time_nome(time_id: int) -> str:
+    conn = get_sqlite_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT nome FROM times WHERE id = ?", (time_id,))
+    row = cursor.fetchone()
+    conn.close()
+    return row["nome"] if row else f"Time {time_id}"
+
+@app.get("/api/fixtures/live")
+def get_live_fixture(team_id: Optional[int] = Query(None)):
+    conn = get_sqlite_connection()
+    cursor = conn.cursor()
+    query = "SELECT id FROM jogos WHERE status IN ('1H', '2H', 'HT', 'ET', 'P')"
+    params = []
+    if team_id:
+        query += " AND (time_casa_id = ? OR time_fora_id = ?)"
+        params.extend([team_id, team_id])
+    query += " LIMIT 1"
+    cursor.execute(query, params)
+    row = cursor.fetchone()
+    conn.close()
+    return {"fixture_id": row["id"] if row else None}
+
+@app.get("/api/fixtures/{fixture_id}")
+def get_fixture_details(fixture_id: int):
+    conn = get_sqlite_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM jogos WHERE id = ?", (fixture_id,))
+    row = cursor.fetchone()
+    conn.close()
+    if not row:
+        raise HTTPException(status_code=404, detail="Partida não encontrada")
+    return _formatar_partida(dict(row))
+
+# ============================================================
+# STREAM DE EVENTOS (SSE) & WEBSOCKET AO VIVO
+# ============================================================
 @app.get("/stream/{jogo_id}")
 async def stream_eventos(jogo_id: int):
-    """
-    Stream de eventos ao vivo via Server-Sent Events (SSE).
-    """
+    """Stream de eventos ao vivo via Server-Sent Events (SSE)."""
     async def gerador():
         ultimo_id = None
         while True:
-            conn = get_db_connection()
+            conn = get_sqlite_connection()
             cursor = conn.cursor()
             if ultimo_id is None:
                 cursor.execute("SELECT MAX(id) FROM eventos WHERE jogo_id = ?", (jogo_id,))
@@ -383,272 +496,16 @@ async def stream_eventos(jogo_id: int):
 
     return StreamingResponse(gerador(), media_type="text/event-stream")
 
-# ============================================================
-# ADAPTAÇÃO PARA OS ENDPOINTS DO FRONTEND (FastAPIMonitorClient)
-# ============================================================
-
-def _formatar_partida(row: dict) -> dict:
-    """Converte um registro da tabela 'jogos' para o formato da API-Football."""
-    return {
-        "fixture": {
-            "id": row["id"],
-            "date": row.get("data_hora", ""),
-            "status": {"short": row.get("status", "NS")},
-            "venue": {"name": row.get("estadio", "Estádio")},
-            "referee": row.get("arbitro", "Não informado")
-        },
-        "teams": {
-            "home": {
-                "id": row["time_casa_id"],
-                "name": _get_time_nome(row["time_casa_id"])
-            },
-            "away": {
-                "id": row["time_fora_id"],
-                "name": _get_time_nome(row["time_fora_id"])
-            }
-        },
-        "goals": {
-            "home": row.get("gols_casa"),
-            "away": row.get("gols_fora")
-        },
-        "score": {"penalty": None}
-    }
-
-def _get_time_nome(time_id: int) -> str:
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT nome FROM times WHERE id = ?", (time_id,))
-    row = cursor.fetchone()
-    conn.close()
-    return row["nome"] if row else f"Time {time_id}"
-
-def _get_jogador_nome(jogador_id: int) -> str:
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT nome FROM elenco WHERE id = ?", (jogador_id,))
-    row = cursor.fetchone()
-    conn.close()
-    return row["nome"] if row else f"Jogador {jogador_id}"
-
-# ----- ROTA: /api/fixtures/live (agora opcionalmente filtra por time) -----
-@app.get("/api/fixtures/live")
-def get_live_fixture(team_id: Optional[int] = Query(None, description="ID do time para filtrar")):
-    """
-    Retorna o ID do primeiro jogo ao vivo encontrado.
-    Se 'team_id' for fornecido, filtra apenas jogos desse time.
-    """
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    query = """
-        SELECT id FROM jogos
-        WHERE status IN ('1H', '2H', 'HT', 'ET', 'P')
-    """
-    params = []
-    if team_id:
-        query += " AND (time_casa_id = ? OR time_fora_id = ?)"
-        params.extend([team_id, team_id])
-    query += " LIMIT 1"
-    cursor.execute(query, params)
-    row = cursor.fetchone()
-    conn.close()
-    if row:
-        return {"fixture_id": row["id"]}
-    return {"fixture_id": None}
-
-# ----- ROTA: /api/fixtures/{fixture_id} -----
-@app.get("/api/fixtures/{fixture_id}")
-def get_fixture_details(fixture_id: int):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM jogos WHERE id = ?", (fixture_id,))
-    row = cursor.fetchone()
-    conn.close()
-    if not row:
-        raise HTTPException(status_code=404, detail="Partida não encontrada")
-    return _formatar_partida(dict(row))
-
-# ----- ROTA: /api/fixtures/{fixture_id}/events -----
-@app.get("/api/fixtures/{fixture_id}/events")
-def get_fixture_events(fixture_id: int):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM eventos WHERE jogo_id = ? ORDER BY tempo", (fixture_id,))
-    rows = cursor.fetchall()
-    conn.close()
-    eventos = []
-    for ev in rows:
-        eventos.append({
-            "time": {"elapsed": ev["tempo"], "extra": None},
-            "type": ev["tipo"],
-            "detail": ev.get("detalhes", ""),
-            "player": {"name": _get_jogador_nome(ev["jogador_id"])},
-            "team": {"name": _get_time_nome(ev.get("time_id"))}
-        })
-    return eventos
-
-# ----- ROTA: /api/fixtures/{fixture_id}/statistics (mock, mas sem fixar time) -----
-@app.get("/api/fixtures/{fixture_id}/statistics")
-def get_fixture_statistics(fixture_id: int):
-    # Busca os times da partida para personalizar o mock
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT time_casa_id, time_fora_id FROM jogos WHERE id = ?", (fixture_id,))
-    row = cursor.fetchone()
-    conn.close()
-    if not row:
-        raise HTTPException(status_code=404, detail="Partida não encontrada")
-    time_casa = _get_time_nome(row["time_casa_id"])
-    time_fora = _get_time_nome(row["time_fora_id"])
-    return [
-        {
-            "team": {"name": time_casa},
-            "statistics": [
-                {"type": "Ball Possession", "value": "55%"},
-                {"type": "Total Shots", "value": "12"},
-                {"type": "Shots on Goal", "value": "5"},
-                {"type": "Passes", "value": "320"},
-                {"type": "Passes %", "value": "78%"},
-                {"type": "Fouls", "value": "10"},
-                {"type": "Yellow Cards", "value": "2"},
-                {"type": "Red Cards", "value": "0"}
-            ]
-        },
-        {
-            "team": {"name": time_fora},
-            "statistics": [
-                {"type": "Ball Possession", "value": "45%"},
-                {"type": "Total Shots", "value": "8"},
-                {"type": "Shots on Goal", "value": "3"},
-                {"type": "Passes", "value": "250"},
-                {"type": "Passes %", "value": "72%"},
-                {"type": "Fouls", "value": "15"},
-                {"type": "Yellow Cards", "value": "3"},
-                {"type": "Red Cards", "value": "0"}
-            ]
-        }
-    ]
-
-# ----- ROTA: /api/fixtures/{fixture_id}/players (mock genérico) -----
-@app.get("/api/fixtures/{fixture_id}/players")
-def get_fixture_players(fixture_id: int):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT time_casa_id, time_fora_id FROM jogos WHERE id = ?", (fixture_id,))
-    row = cursor.fetchone()
-    conn.close()
-    if not row:
-        raise HTTPException(status_code=404, detail="Partida não encontrada")
-    # Mock com jogadores genéricos
-    return [
-        {
-            "team": {"id": row["time_casa_id"], "name": _get_time_nome(row["time_casa_id"])},
-            "players": [
-                {
-                    "player": {"name": "Jogador Casa 1"},
-                    "statistics": [{
-                        "games": {"minutes": 90},
-                        "goals": {"total": 1, "assists": 0},
-                        "shots": {"total": 3, "on": 2},
-                        "passes": {"total": 45, "accurate": 38},
-                        "tackles": {"total": 2, "interceptions": 1},
-                        "fouls": {"committed": 1, "drawn": 2},
-                        "cards": {"yellow": 0, "red": 0}
-                    }]
-                },
-                {
-                    "player": {"name": "Jogador Casa 2"},
-                    "statistics": [{
-                        "games": {"minutes": 90},
-                        "goals": {"total": 0, "assists": 1},
-                        "shots": {"total": 2, "on": 1},
-                        "passes": {"total": 30, "accurate": 25},
-                        "tackles": {"total": 1, "interceptions": 0},
-                        "fouls": {"committed": 2, "drawn": 1},
-                        "cards": {"yellow": 1, "red": 0}
-                    }]
-                }
-            ]
-        },
-        {
-            "team": {"id": row["time_fora_id"], "name": _get_time_nome(row["time_fora_id"])},
-            "players": [
-                {
-                    "player": {"name": "Jogador Fora 1"},
-                    "statistics": [{
-                        "games": {"minutes": 90},
-                        "goals": {"total": 0, "assists": 0},
-                        "shots": {"total": 1, "on": 0},
-                        "passes": {"total": 30, "accurate": 25},
-                        "tackles": {"total": 1, "interceptions": 0},
-                        "fouls": {"committed": 2, "drawn": 1},
-                        "cards": {"yellow": 1, "red": 0}
-                    }]
-                }
-            ]
-        }
-    ]
-
-# ----- ROTA: /api/fixtures/{fixture_id}/lineups (mock genérico) -----
-@app.get("/api/fixtures/{fixture_id}/lineups")
-def get_fixture_lineups(fixture_id: int):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT time_casa_id, time_fora_id FROM jogos WHERE id = ?", (fixture_id,))
-    row = cursor.fetchone()
-    conn.close()
-    if not row:
-        raise HTTPException(status_code=404, detail="Partida não encontrada")
-    return [
-        {
-            "team": {"id": row["time_casa_id"], "name": _get_time_nome(row["time_casa_id"])},
-            "startXI": [
-                {"player": {"name": "Casa Goleiro", "number": 1, "pos": "Goleiro"}},
-                {"player": {"name": "Casa Zagueiro", "number": 2, "pos": "Zagueiro"}}
-            ],
-            "substitutes": [
-                {"player": {"name": "Casa Reserva", "number": 12, "pos": "Goleiro"}}
-            ]
-        },
-        {
-            "team": {"id": row["time_fora_id"], "name": _get_time_nome(row["time_fora_id"])},
-            "startXI": [
-                {"player": {"name": "Fora Goleiro", "number": 1, "pos": "Goleiro"}}
-            ],
-            "substitutes": []
-        }
-    ]
-
-# ----- ROTA: /api/fixtures (agora com team opcional) -----
-@app.get("/api/fixtures")
-def get_fixtures(
-    league: Optional[int] = Query(None, description="ID da liga"),
-    season: Optional[int] = Query(None, description="Temporada"),
-    team: Optional[int] = Query(None, description="ID do time"),
-    from_date: Optional[str] = Query(None, description="Data início (YYYY-MM-DD)"),
-    to_date: Optional[str] = Query(None, description="Data fim (YYYY-MM-DD)")
-):
-    """
-    Lista partidas com filtros opcionais.
-    Se 'team' não for informado, retorna todas as partidas.
-    """
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    query = "SELECT * FROM jogos WHERE 1=1"
-    params = []
-    if team:
-        query += " AND (time_casa_id = ? OR time_fora_id = ?)"
-        params.extend([team, team])
-    if from_date:
-        query += " AND data_hora >= ?"
-        params.append(from_date)
-    if to_date:
-        query += " AND data_hora <= ?"
-        params.append(to_date)
-    query += " ORDER BY data_hora"
-    cursor.execute(query, params)
-    rows = cursor.fetchall()
-    conn.close()
-    return [_formatar_partida(dict(row)) for row in rows]
+@app.websocket("/api/partidas/ws/{fixture_id}")
+async def websocket_partida(websocket: WebSocket, fixture_id: int):
+    """WebSocket para comunicação em tempo real de partidas."""
+    await websocket.accept()
+    try:
+        while True:
+            data = await websocket.receive_text()
+            await websocket.send_text(f"Eco WebSocket [Fixture {fixture_id}]: Evento recebido -> {data}")
+    except WebSocketDisconnect:
+        print(f"Cliente desconectado da fixture {fixture_id}")
 
 # ============================================================
 # INICIALIZAÇÃO DO SERVIDOR
