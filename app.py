@@ -25,6 +25,8 @@ from routes import (
     treinos,
     wellbeing,
     relatorios,
+    ia,
+    ecossistema_proxy,
 )
 
 app = Flask(__name__)
@@ -46,6 +48,8 @@ app.register_blueprint(jogos.bp)
 app.register_blueprint(treinos.bp)
 app.register_blueprint(wellbeing.bp)
 app.register_blueprint(relatorios.bp)
+app.register_blueprint(ia.bp)
+app.register_blueprint(ecossistema_proxy.bp)
 
 
 # ============================================================
@@ -67,6 +71,8 @@ def home():
             'rtp_ecossistema': '/fastapi/api/ecossistema/fisioterapia/rtp/<atleta_id>',
             'scout_adversario': '/fastapi/api/ecossistema/analista/scout-adversario',
             'dashboard_executivo': '/fastapi/api/ecossistema/direcao/dashboard-executivo',
+            'ia_agente': '/api/ecossistema/ia/perguntar',
+            'ia_status': '/api/ecossistema/ia/status',
             'health': '/api/health',
             'fastapi_proxy': '/fastapi/<path>',
         }
